@@ -22,6 +22,23 @@ npm run dev:web
 
 Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 기본 화면만 실행됩니다.
 
+## 폴더 구조
+
+| 경로 | 역할 |
+|---|---|
+| `apps/web/src/features/` | 인증·워크스페이스·채팅·업무·캘린더별 화면과 로직 |
+| `apps/web/src/components/`, `hooks/` | 도메인에 묶이지 않는 UI와 재사용 훅 |
+| `apps/web/src/services/`, `store/` | 외부 서비스 연결과 클라이언트 상태 (후속 일차에서 구현) |
+| `apps/web/src/types/`, `config/` | 웹 앱 공통 타입과 환경 설정 |
+| `shared/contracts/` | 웹·소켓 서버 간 이벤트 계약 (10일차 이후 구현) |
+| `apps/socket-server/`, `functions/` | 채팅 서버와 서버 권한 로직 (후속 일차에서 구현) |
+
+## 환경 변수
+
+웹 앱의 예시는 `apps/web/.env.example`에 있습니다. Firebase를 연결하는 6일차에 이를 `apps/web/.env.local`로 복사하고 웹 클라이언트 설정값을 채웁니다. 지금은 복사하지 않아도 기본 화면이 실행됩니다. `.env.local`은 Git에서 제외됩니다.
+
+`VITE_` 변수는 브라우저 번들에 공개되므로 서버 비밀키를 넣지 않습니다. 소켓 주소의 기본값은 `http://localhost:3001`이며, 실제 서버 연결은 10일차에 추가합니다.
+
 초기 설정 검증:
 
 ```bash
