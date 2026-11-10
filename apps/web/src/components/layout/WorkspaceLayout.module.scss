@@ -1,0 +1,215 @@
+.shell {
+  display: grid;
+  grid-template-columns: minmax(248px, 280px) minmax(0, 1fr);
+  min-height: 100svh;
+}
+
+.skipLink {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--sidebar);
+  font-weight: 700;
+  transform: translateY(-160%);
+
+  &:focus {
+    transform: translateY(0);
+  }
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 38px;
+  padding: 32px 22px 24px;
+  border-right: 1px solid var(--line);
+  background: var(--sidebar);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.brandMark {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.09em;
+  line-height: 1;
+
+  span {
+    margin: 0 0.06em 0 0.02em;
+    color: var(--accent);
+  }
+}
+
+.brandName {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+}
+
+.sectionLabel {
+  margin: 0 0 12px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.workspaceCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #2b304a;
+
+  strong,
+  span:last-child {
+    display: block;
+  }
+
+  strong {
+    font-size: 14px;
+  }
+
+  span:last-child {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+}
+
+.workspaceIcon {
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--sidebar);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.navigationSection {
+  flex: 1;
+}
+
+.emptyNavigation {
+  margin: 0;
+  padding: 18px 12px;
+  border: 1px dashed #454a65;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.sidebarFooter {
+  margin: 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mobileStatus {
+  display: none;
+}
+
+.mainColumn {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  background: radial-gradient(circle at 90% 10%, #353453 0, transparent 35%), var(--page);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 0 clamp(24px, 5vw, 72px);
+  border-bottom: 1px solid var(--line);
+  color: var(--soft-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.previewBadge {
+  padding: 7px 10px;
+  border: 1px solid #53506d;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.main {
+  display: flex;
+  width: 100%;
+  max-width: 1280px;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: clamp(32px, 6vw, 88px) clamp(24px, 5vw, 72px);
+}
+
+@media (max-width: 760px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand {
+    gap: 10px;
+    padding: 0;
+  }
+
+  .brandMark {
+    font-size: 30px;
+  }
+
+  .brandName {
+    font-size: 9px;
+  }
+
+  .workspaceSection,
+  .navigationSection,
+  .sidebarFooter {
+    display: none;
+  }
+
+  .mobileStatus {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    text-align: right;
+  }
+
+  .topbar {
+    min-height: 58px;
+    padding: 0 20px;
+  }
+
+  .main {
+    padding: 40px 20px 56px;
+  }
+}
