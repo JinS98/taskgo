@@ -1,10 +1,6 @@
-import { useState } from 'react';
 import { WorkspaceLayout } from './components/layout/WorkspaceLayout';
-import {
-  getConversationName,
-  initialConversation,
-  type ConversationSelection,
-} from './features/chat/demoConversations';
+import { getConversationName } from './features/chat/demoConversations';
+import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
 import type { AppView } from './types/domain';
 import styles from './App.module.scss';
 
@@ -28,8 +24,8 @@ const viewCopy: Record<Exclude<AppView, 'chat'>, { eyebrow: string; title: strin
 };
 
 export default function App() {
-  const [activeView, setActiveView] = useState<AppView>('chat');
-  const [selectedConversation, setSelectedConversation] = useState<ConversationSelection>(initialConversation);
+  const activeView = useWorkspaceNavigationStore((state) => state.activeView);
+  const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
 
   const selectedName = getConversationName(selectedConversation);
   const currentView = activeView === 'chat'
@@ -40,18 +36,8 @@ export default function App() {
     }
     : viewCopy[activeView];
 
-  function handleConversationChange(conversation: ConversationSelection) {
-    setSelectedConversation(conversation);
-    setActiveView('chat');
-  }
-
   return (
-    <WorkspaceLayout
-      activeView={activeView}
-      selectedConversation={selectedConversation}
-      onViewChange={setActiveView}
-      onConversationChange={handleConversationChange}
-    >
+    <WorkspaceLayout>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>
         <h1 id="hero-title" aria-live="polite">{currentView.title}</h1>

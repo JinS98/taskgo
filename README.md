@@ -4,10 +4,10 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 4일차 사이드바 UI 구현.** 샘플 채널·DM과 채팅·업무 보드·캘린더 화면 전환을 직접 눌러 볼 수 있습니다. 실제 로그인·메시지 전송·업무·AI·배포는 구현되어 있지 않으며 `apps/socket-server`, `functions`는 설계용 폴더입니다.
+> **현재 상태: 5일차 상태 관리 구현.** 샘플 채널·DM과 채팅·업무 보드·캘린더 화면 전환을 직접 눌러 볼 수 있고, 선택 상태는 Zustand 스토어에서 공유됩니다. 실제 로그인·메시지 전송·업무·AI·배포는 구현되어 있지 않으며 `apps/socket-server`, `functions`는 설계용 폴더입니다.
 
 ## 기술 구성
-- Web: React + TypeScript + Vite + SCSS Modules + Zustand (예정) + FullCalendar (예정)
+- Web: React + TypeScript + Vite + SCSS Modules + Zustand + FullCalendar (예정)
 - 실시간 채팅: Node.js + Socket.io (Cloud Run 예정)
 - 인증/DB: Firebase Auth + Cloud Firestore
 - 서버 로직: Cloud Functions + 예약 작업 (예정)
@@ -20,7 +20,7 @@ npm install
 npm run dev:web
 ```
 
-Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 샘플 목록과 화면 전환을 확인할 수 있습니다. 선택 상태는 현재 화면 안에서만 유지되며 실제 서버 데이터는 연결되지 않습니다.
+Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 샘플 목록과 화면 전환을 확인할 수 있습니다. 선택 상태는 앱 실행 중 Zustand 스토어에서 공유되며 새로고침하면 초기화됩니다. 실제 서버 데이터는 연결되지 않습니다.
 
 ## 폴더 구조
 
@@ -28,7 +28,7 @@ Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 
 |---|---|
 | `apps/web/src/features/` | 인증·워크스페이스·채팅·업무·캘린더별 화면과 로직 |
 | `apps/web/src/components/`, `hooks/` | 도메인에 묶이지 않는 UI와 재사용 훅 |
-| `apps/web/src/services/`, `store/` | 외부 서비스 연결과 클라이언트 상태 (후속 일차에서 구현) |
+| `apps/web/src/services/`, `store/` | 외부 서비스 연결 (후속 일차)과 클라이언트 상태 관리 |
 | `apps/web/src/types/`, `config/` | 웹 앱 공통 타입과 환경 설정 |
 | `shared/contracts/` | 웹·소켓 서버 간 이벤트 계약 (10일차 이후 구현) |
 | `apps/socket-server/`, `functions/` | 채팅 서버와 서버 권한 로직 (후속 일차에서 구현) |

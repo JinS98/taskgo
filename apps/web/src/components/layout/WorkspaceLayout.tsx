@@ -3,17 +3,13 @@ import {
   demoChannels,
   demoDirectMessages,
   getConversationName,
-  type ConversationSelection,
 } from '../../features/chat/demoConversations';
+import { useWorkspaceNavigationStore } from '../../store/useWorkspaceNavigationStore';
 import type { AppView } from '../../types/domain';
 import styles from './WorkspaceLayout.module.scss';
 
 interface WorkspaceLayoutProps {
   children: ReactNode;
-  activeView: AppView;
-  selectedConversation: ConversationSelection;
-  onViewChange: (view: AppView) => void;
-  onConversationChange: (conversation: ConversationSelection) => void;
 }
 
 const viewTabs: { id: AppView; label: string }[] = [
@@ -22,13 +18,11 @@ const viewTabs: { id: AppView; label: string }[] = [
   { id: 'calendar', label: '캘린더' },
 ];
 
-export function WorkspaceLayout({
-  children,
-  activeView,
-  selectedConversation,
-  onViewChange,
-  onConversationChange,
-}: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
+  const activeView = useWorkspaceNavigationStore((state) => state.activeView);
+  const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
+  const setView = useWorkspaceNavigationStore((state) => state.setView);
+  const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
   const currentTitle = activeView === 'chat'
     ? `${selectedConversation.kind === 'channel' ? '# ' : ''}${getConversationName(selectedConversation)}`
     : viewTabs.find(({ id }) => id === activeView)?.label;
@@ -70,7 +64,7 @@ export function WorkspaceLayout({
                 className={`${styles.navButton} ${activeView === id ? styles.active : ''}`}
                 type="button"
                 aria-pressed={activeView === id}
-                onClick={() => onViewChange(id)}
+                onClick={() => setView(id)}
               >
                 {label}
               </button>
@@ -88,7 +82,7 @@ export function WorkspaceLayout({
                     className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id ? styles.active : ''}`}
                     type="button"
                     aria-pressed={activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id}
-                    onClick={() => onConversationChange({ kind: 'channel', id })}
+                    onClick={() => selectConversation({ kind: 'channel', id })}
                   >
                     <span className={styles.channelIcon} aria-hidden="true">#</span>
                     <span>{name}</span>
@@ -107,7 +101,7 @@ export function WorkspaceLayout({
                     className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id ? styles.active : ''}`}
                     type="button"
                     aria-pressed={activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id}
-                    onClick={() => onConversationChange({ kind: 'dm', id })}
+                    onClick={() => selectConversation({ kind: 'dm', id })}
                   >
                     <span className={styles.avatar} aria-hidden="true">{initials}</span>
                     <span>{name}</span>

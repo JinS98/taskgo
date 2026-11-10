@@ -26,18 +26,22 @@ const server = await createServer({
 
 try {
   const { default: App } = await server.ssrLoadModule('/src/App.tsx');
+  const { useWorkspaceNavigationStore } = await server.ssrLoadModule('/src/store/useWorkspaceNavigationStore.ts');
   const user = userEvent.setup();
-  render(React.createElement(App));
+  const app = render(React.createElement(App));
 
   const title = () => screen.getByRole('heading', { level: 1 }).textContent;
   assert.equal(title(), '# 전체');
 
   await user.click(screen.getByRole('button', { name: '업무 보드' }));
   assert.equal(title(), '업무 보드');
+  assert.equal(useWorkspaceNavigationStore.getState().activeView, 'board');
 
   await user.click(screen.getByRole('button', { name: '팀원 A' }));
   assert.equal(title(), '팀원 A');
   assert.equal(screen.getByRole('button', { name: '채팅' }).getAttribute('aria-pressed'), 'true');
+  assert.equal(useWorkspaceNavigationStore.getState().activeView, 'chat');
+  assert.deepEqual(useWorkspaceNavigationStore.getState().selectedConversation, { kind: 'dm', id: 'member-a' });
 
   await user.click(screen.getByRole('button', { name: '캘린더' }));
   assert.equal(title(), '팀 캘린더');
@@ -50,8 +54,13 @@ try {
   await user.keyboard('{Enter}');
   assert.equal(title(), '# 프로젝트');
   assert.equal(projectChannel.getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(useWorkspaceNavigationStore.getState().selectedConversation, { kind: 'channel', id: 'project' });
 
-  console.log('Sidebar view, channel, and DM selection passed.');
+  app.unmount();
+  render(React.createElement(App));
+  assert.equal(title(), '# 프로젝트');
+
+  console.log('Shared navigation store, view switching, and conversation selection passed.');
 } finally {
   cleanup();
   await server.close();
