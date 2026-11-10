@@ -5,5 +5,9 @@ dist/
 .env.local
 .env.*.local
 .firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+firebase.auth.local.json
 coverage/
 .DS_Store

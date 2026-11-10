@@ -24,4 +24,6 @@ export function getFirebaseClientConfig(): FirebaseClientConfig {
   return { apiKey, authDomain, projectId, appId };
 }
 
+export const useFirebaseEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
+
 export const socketUrl = import.meta.env.VITE_SOCKET_URL?.trim() || 'http://localhost:3001';

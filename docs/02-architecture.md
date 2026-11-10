@@ -25,7 +25,7 @@ Cloud Functions + Scheduler (검수/알림/AI)
 - `apps/web/src/features/`: 인증·워크스페이스·채팅·업무·캘린더 기능별 UI와 로직. 공용 UI는 `components/`, 재사용 훅은 `hooks/`에 둔다.
 - `apps/web/src/types/domain.ts`: 아직 확정되지 않은 Firestore 문서 스키마 대신 화면·상태 관리에 필요한 공통 ID·역할·뷰 이름만 정의한다. 실제 필드와 권한 모델은 8일차/17일차에 확정한다.
 - `apps/web/src/config/env.ts`: Vite 클라이언트 설정을 읽는다. Firebase 설정은 인증 기능을 사용할 때만 검사하므로 초기 화면은 설정 없이 실행된다.
-- `apps/web/src/services/`는 Firebase·소켓 어댑터, `store/`는 클라이언트 상태를 담당한다. 구체 구현은 해당 일차에 추가한다.
+- `apps/web/src/services/firebase.ts`는 Firebase Auth·Firestore를 필요할 때 초기화하고 명시적 설정에서만 에뮬레이터에 연결한다. 소켓 어댑터는 이후 추가한다. `store/`는 클라이언트 상태를 담당한다.
 - `shared/contracts/`는 웹과 소켓 서버 사이의 이벤트 계약용으로 남겨 둔다. 브라우저 타입만으로 접근 권한을 보장하지 않으며 서버가 멤버십과 상태 전이를 검증한다.
 - Vite 프로젝트 루트가 `apps/web`이므로 웹 환경 파일은 `apps/web/.env.local`에 둔다. `VITE_` 값은 클라이언트에 공개되며 서버 비밀키는 여기에 두지 않는다.
 

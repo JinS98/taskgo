@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:emulator": "vite --mode emulator",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test:ui": "node scripts/verify-sidebar.mjs"
+    "test:ui": "node scripts/verify-sidebar.mjs",
+    "verify:firebase": "node scripts/verify-firebase.mjs"
   },
   "dependencies": {
+    "firebase": "^11.10.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zustand": "^5.1.0"

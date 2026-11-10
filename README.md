@@ -4,7 +4,7 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 5일차 상태 관리 구현.** 샘플 채널·DM과 채팅·업무 보드·캘린더 화면 전환을 직접 눌러 볼 수 있고, 선택 상태는 Zustand 스토어에서 공유됩니다. 실제 로그인·메시지 전송·업무·AI·배포는 구현되어 있지 않으며 `apps/socket-server`, `functions`는 설계용 폴더입니다.
+> **현재 상태: 6일차 Firebase 개발 환경 준비.** 샘플 채널·DM과 화면 전환을 확인할 수 있고, Firebase Auth·Firestore 연결 및 로컬 에뮬레이터를 설정했습니다. 로그인 화면과 실제 메시지·업무·AI 기능은 아직 구현되지 않았으며 `apps/socket-server`, `functions`는 설계용 폴더입니다.
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand + FullCalendar (예정)
@@ -20,7 +20,28 @@ npm install
 npm run dev:web
 ```
 
-Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 샘플 목록과 화면 전환을 확인할 수 있습니다. 선택 상태는 앱 실행 중 Zustand 스토어에서 공유되며 새로고침하면 초기화됩니다. 실제 서버 데이터는 연결되지 않습니다.
+Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정 없이도 샘플 목록과 화면 전환을 확인할 수 있습니다. 선택 상태는 앱 실행 중 Zustand 스토어에서 공유되며 새로고침하면 초기화됩니다. 현재 화면은 Firebase 데이터를 요청하지 않습니다.
+
+## Firebase 개발 환경
+
+실제 Firebase 프로젝트는 `taskgo-jins98`, 웹 앱은 `taskgo-web`입니다. 이메일·비밀번호와 Google 로그인 공급자를 활성화했고, Cloud Firestore 기본 데이터베이스는 서울(`asia-northeast3`)에 생성했습니다. 현재 [Firestore 규칙](firestore.rules)은 모든 읽기·쓰기를 차단합니다. 멤버십별 권한 규칙은 8일차에 구현합니다.
+
+로컬 에뮬레이터는 Java 21이 필요합니다. 터미널 두 개에서 실행합니다.
+
+```bash
+npm run emulators
+npm run dev:web:emulator
+```
+
+인증 에뮬레이터는 `127.0.0.1:9099`, Firestore는 `127.0.0.1:8080`, 에뮬레이터 UI는 `127.0.0.1:4000`을 사용합니다. 웹 앱의 `emulator` 모드는 [가상 프로젝트 설정](apps/web/.env.emulator)을 사용하므로 실제 Firebase 프로젝트에 접속하지 않습니다. 로그인 UI와 실제 데이터 사용은 7~8일차에 추가합니다.
+
+실제 프로젝트 웹 설정은 [환경 변수 예시](apps/web/.env.example)를 `apps/web/.env.local`로 복사해 입력합니다. 이 PC에는 웹 앱 설정이 입력되어 있습니다. `VITE_USE_FIREBASE_EMULATORS=false`일 때만 실제 프로젝트를 사용하며 `.env.local`은 Git에서 제외됩니다.
+
+인증 공급자 설정을 다시 배포하려면 [예시 설정](firebase.auth.example.json)을 `firebase.auth.local.json`으로 복사하고 Google OAuth 지원 이메일을 입력한 뒤 다음 명령을 사용합니다. 로컬 설정 파일은 Git에서 제외됩니다.
+
+```bash
+npx firebase deploy --only auth --config firebase.auth.local.json --project taskgo-jins98
+```
 
 ## 폴더 구조
 
@@ -28,14 +49,14 @@ Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 
 |---|---|
 | `apps/web/src/features/` | 인증·워크스페이스·채팅·업무·캘린더별 화면과 로직 |
 | `apps/web/src/components/`, `hooks/` | 도메인에 묶이지 않는 UI와 재사용 훅 |
-| `apps/web/src/services/`, `store/` | 외부 서비스 연결 (후속 일차)과 클라이언트 상태 관리 |
+| `apps/web/src/services/`, `store/` | Firebase 연결과 클라이언트 상태 관리 |
 | `apps/web/src/types/`, `config/` | 웹 앱 공통 타입과 환경 설정 |
 | `shared/contracts/` | 웹·소켓 서버 간 이벤트 계약 (10일차 이후 구현) |
 | `apps/socket-server/`, `functions/` | 채팅 서버와 서버 권한 로직 (후속 일차에서 구현) |
 
 ## 환경 변수
 
-웹 앱의 예시는 `apps/web/.env.example`에 있습니다. Firebase를 연결하는 6일차에 이를 `apps/web/.env.local`로 복사하고 웹 클라이언트 설정값을 채웁니다. 지금은 복사하지 않아도 기본 화면이 실행됩니다. `.env.local`은 Git에서 제외됩니다.
+웹 앱의 예시는 `apps/web/.env.example`에 있습니다. Firebase 기능을 사용할 때 실제 프로젝트 웹 설정을 `apps/web/.env.local`에 입력합니다. 복사하지 않아도 샘플 화면은 실행됩니다. `.env.local`은 Git에서 제외됩니다.
 
 `VITE_` 변수는 브라우저 번들에 공개되므로 서버 비밀키를 넣지 않습니다. 소켓 주소의 기본값은 `http://localhost:3001`이며, 실제 서버 연결은 10일차에 추가합니다.
 
@@ -46,6 +67,7 @@ npm run typecheck
 npm run lint
 npm run build:web
 npm run test:ui
+npm run test:firebase
 ```
 
 ## 문서
