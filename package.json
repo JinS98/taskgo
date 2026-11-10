@@ -1,0 +1,13 @@
+{
+  "name": "taskgo",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @taskgo/web",
+    "build:web": "npm run build -w @taskgo/web",
+    "typecheck": "npm run typecheck -w @taskgo/web"
+  }
+}
