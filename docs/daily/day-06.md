@@ -5,11 +5,12 @@
 - **현재 상태: 미착수**
 
 ## 목표
-Firebase Auth·Firestore·에뮬레이터.
+Firebase Auth·Firestore·에뮬레이터와 이메일·비밀번호/Google 로그인 방식 설정.
 
 ## 작업 체크리스트
 - [ ] 관련 기획 정책과 이전 일차 산출물 확인
 - [ ] Firebase Auth·Firestore·에뮬레이터
+- [ ] 이메일·비밀번호와 Google 로그인 공급자 활성화 및 개발 환경 확인
 - [ ] 예외 상황·권한·로딩·실패 시나리오 검토
 - [ ] 타입/테스트/수동 검증 후 변경사항 기록
 - [ ] README 또는 해당 docs 최신화
