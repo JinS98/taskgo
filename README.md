@@ -7,7 +7,7 @@
 > **현재 상태: 개발 시작용 스캐폴드.** 로그인·채팅·업무·AI·배포는 구현되어 있지 않습니다. `apps/web`은 화면 렌더링만 가능한 초기 템플릿이고 `apps/socket-server`, `functions`는 설계용 폴더입니다.
 
 ## 기술 구성
-- Web: React + TypeScript + Vite + SCSS Modules + Zustand (예정) + FullCalendar (예정)
+- Web: React + TypeScript + Vite + SCSS (CSS Modules는 컴포넌트 화면 구현 시 적용) + Zustand (예정) + FullCalendar (예정)
 - 실시간 채팅: Node.js + Socket.io (Cloud Run 예정)
 - 인증/DB: Firebase Auth + Cloud Firestore
 - 서버 로직: Cloud Functions + 예약 작업 (예정)
@@ -20,7 +20,15 @@ npm install
 npm run dev:web
 ```
 
-Node.js 20.19+ 또는 22.12+ 권장. Firebase 설정이나 결제 계정 없이 기본 화면만 실행됩니다.
+Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 기본 화면만 실행됩니다.
+
+초기 설정 검증:
+
+```bash
+npm run typecheck
+npm run lint
+npm run build:web
+```
 
 ## 문서
 - [브랜드 가이드](docs/09-branding.md)
