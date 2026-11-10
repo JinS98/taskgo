@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:ui": "node scripts/verify-sidebar.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -15,12 +16,16 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.9",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.0",
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^16.5.0",
+    "jsdom": "^28.1.0",
     "sass": "^1.83.0",
     "typescript": "~5.7.0",
     "typescript-eslint": "^8.72.2",

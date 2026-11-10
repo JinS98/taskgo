@@ -1,11 +1,38 @@
 import type { ReactNode } from 'react';
+import {
+  demoChannels,
+  demoDirectMessages,
+  getConversationName,
+  type ConversationSelection,
+} from '../../features/chat/demoConversations';
+import type { AppView } from '../../types/domain';
 import styles from './WorkspaceLayout.module.scss';
 
 interface WorkspaceLayoutProps {
   children: ReactNode;
+  activeView: AppView;
+  selectedConversation: ConversationSelection;
+  onViewChange: (view: AppView) => void;
+  onConversationChange: (conversation: ConversationSelection) => void;
 }
 
-export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
+const viewTabs: { id: AppView; label: string }[] = [
+  { id: 'chat', label: '채팅' },
+  { id: 'board', label: '업무 보드' },
+  { id: 'calendar', label: '캘린더' },
+];
+
+export function WorkspaceLayout({
+  children,
+  activeView,
+  selectedConversation,
+  onViewChange,
+  onConversationChange,
+}: WorkspaceLayoutProps) {
+  const currentTitle = activeView === 'chat'
+    ? `${selectedConversation.kind === 'channel' ? '# ' : ''}${getConversationName(selectedConversation)}`
+    : viewTabs.find(({ id }) => id === activeView)?.label;
+
   return (
     <div className={styles.shell}>
       <a className={styles.skipLink} href="#main-content">
@@ -13,37 +40,91 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
       </a>
 
       <aside className={styles.sidebar} aria-label="워크스페이스 영역">
-        <div className={styles.brand}>
-          <span className={styles.brandMark} aria-hidden="true">
-            t<span>:</span>go
-          </span>
-          <span className={styles.brandName}>TASKGO</span>
+        <div className={styles.brandRow}>
+          <div className={styles.brand}>
+            <span className={styles.brandMark} aria-hidden="true">
+              t<span>:</span>go
+            </span>
+            <span className={styles.brandName}>TASKGO</span>
+          </div>
+          <span className={styles.mobileStatus}>샘플 워크스페이스</span>
         </div>
 
         <div className={styles.workspaceSection}>
           <p className={styles.sectionLabel}>워크스페이스</p>
           <div className={styles.workspaceCard}>
-            <span className={styles.workspaceIcon} aria-hidden="true">W</span>
+            <span className={styles.workspaceIcon} aria-hidden="true">T</span>
             <div>
-              <strong>팀 공간 준비 중</strong>
-              <span>워크스페이스 연결 예정</span>
+              <strong>Taskgo 데모 팀</strong>
+              <span>샘플 데이터</span>
             </div>
           </div>
         </div>
 
-        <div className={styles.navigationSection}>
-          <p className={styles.sectionLabel}>탐색 영역</p>
-          <p className={styles.emptyNavigation}>채널과 DM 목록이 이곳에 표시됩니다.</p>
+        <nav className={styles.viewNavigation} aria-label="화면 전환">
+          <p className={styles.sectionLabel}>화면</p>
+          <div className={styles.viewList}>
+            {viewTabs.map(({ id, label }) => (
+              <button
+                key={id}
+                className={`${styles.navButton} ${activeView === id ? styles.active : ''}`}
+                type="button"
+                aria-pressed={activeView === id}
+                onClick={() => onViewChange(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        <div className={styles.conversationGroups}>
+          <section aria-labelledby="channels-heading">
+            <h2 id="channels-heading" className={styles.sectionLabel}>채널</h2>
+            <ul className={styles.conversationList}>
+              {demoChannels.map(({ id, name }) => (
+                <li key={id}>
+                  <button
+                    className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id ? styles.active : ''}`}
+                    type="button"
+                    aria-pressed={activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id}
+                    onClick={() => onConversationChange({ kind: 'channel', id })}
+                  >
+                    <span className={styles.channelIcon} aria-hidden="true">#</span>
+                    <span>{name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section aria-labelledby="dm-heading">
+            <h2 id="dm-heading" className={styles.sectionLabel}>DM</h2>
+            <ul className={styles.conversationList}>
+              {demoDirectMessages.map(({ id, name, initials }) => (
+                <li key={id}>
+                  <button
+                    className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id ? styles.active : ''}`}
+                    type="button"
+                    aria-pressed={activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id}
+                    onClick={() => onConversationChange({ kind: 'dm', id })}
+                  >
+                    <span className={styles.avatar} aria-hidden="true">{initials}</span>
+                    <span>{name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
 
         <p className={styles.sidebarFooter}>대화가 업무가 되는 순간</p>
-        <span className={styles.mobileStatus}>팀 공간 준비 중</span>
       </aside>
 
       <div className={styles.mainColumn}>
         <header className={styles.topbar}>
-          <span>워크스페이스</span>
-          <span className={styles.previewBadge}>화면 미리보기</span>
+          <span>{currentTitle}</span>
+          <span className={styles.previewBadge}>샘플 화면</span>
         </header>
         <main id="main-content" className={styles.main}>
           {children}

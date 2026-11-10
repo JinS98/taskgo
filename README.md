@@ -4,7 +4,7 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 3일차 레이아웃 구현.** 반응형 워크스페이스 화면을 미리 볼 수 있습니다. 로그인·채팅·업무·AI·배포는 구현되어 있지 않으며 `apps/socket-server`, `functions`는 설계용 폴더입니다.
+> **현재 상태: 4일차 사이드바 UI 구현.** 샘플 채널·DM과 채팅·업무 보드·캘린더 화면 전환을 직접 눌러 볼 수 있습니다. 실제 로그인·메시지 전송·업무·AI·배포는 구현되어 있지 않으며 `apps/socket-server`, `functions`는 설계용 폴더입니다.
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand (예정) + FullCalendar (예정)
@@ -13,14 +13,14 @@
 - 서버 로직: Cloud Functions + 예약 작업 (예정)
 - 개발: Firebase Emulator Suite, 로컬 Socket.io
 
-## 실행 (레이아웃 미리보기)
+## 실행 (사이드바 동작 미리보기)
 
 ```bash
 npm install
 npm run dev:web
 ```
 
-Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 레이아웃 미리보기가 실행됩니다.
+Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 샘플 목록과 화면 전환을 확인할 수 있습니다. 선택 상태는 현재 화면 안에서만 유지되며 실제 서버 데이터는 연결되지 않습니다.
 
 ## 폴더 구조
 
@@ -45,6 +45,7 @@ Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정이나 결제 계정 없이 
 npm run typecheck
 npm run lint
 npm run build:web
+npm run test:ui
 ```
 
 ## 문서

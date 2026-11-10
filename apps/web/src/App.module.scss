@@ -120,6 +120,11 @@
   }
 }
 
+.activeCard {
+  border-color: #8071be;
+  background: #302f4d;
+}
+
 .cardNumber {
   color: var(--accent);
   font-size: 12px;
@@ -137,10 +142,6 @@
   .hero {
     padding: 40px 26px;
     border-radius: 22px;
-  }
-
-  .desktopBreak {
-    display: none;
   }
 
   .flow {
