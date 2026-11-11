@@ -306,6 +306,8 @@
 .main::-webkit-scrollbar-track { background: var(--page); }
 .main::-webkit-scrollbar-thumb { border-color: var(--page); }
 
+.chatMain { overflow: hidden; padding: 0; }
+
 @media (max-width: 760px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
@@ -408,4 +410,6 @@
   .main {
     padding: 40px 20px 56px;
   }
+
+  .chatMain { padding: 0; }
 }

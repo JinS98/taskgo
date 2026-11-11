@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test:ui": "node scripts/verify-sidebar.mjs",
+    "verify:chat": "node scripts/verify-chat.mjs",
     "verify:firebase": "node scripts/verify-firebase.mjs",
     "verify:auth": "node scripts/verify-auth.mjs",
     "verify:workspace": "node scripts/verify-workspace.mjs"

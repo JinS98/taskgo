@@ -22,6 +22,7 @@ let services;
 try {
   const { AuthTestHarness } = await server.ssrLoadModule('/src/features/auth/AuthTestHarness.tsx');
   const { getFirebaseServices } = await server.ssrLoadModule('/src/services/firebase.ts');
+  const { useDemoChatStore } = await server.ssrLoadModule('/src/features/chat/useDemoChatStore.ts');
   services = getFirebaseServices();
   const user = userEvent.setup();
   render(React.createElement(AuthTestHarness));
@@ -65,8 +66,10 @@ try {
 
   await user.click(screen.getByRole('button', { name: '계정' }));
   assert.match(screen.getByLabelText('계정 설정').textContent, /이메일·비밀번호/);
+  act(() => { useDemoChatStore.getState().setDraft(`${passwordUid}:test:channel:general`, '로그아웃 시 삭제할 초안'); });
   await user.click(screen.getByRole('button', { name: '로그아웃' }));
   await screen.findByRole('button', { name: '이메일로 로그인' });
+  assert.deepEqual(useDemoChatStore.getState().draftsByRoom, {});
 
   await user.click(screen.getByRole('button', { name: '회원가입' }));
   await user.type(screen.getByRole('textbox', { name: '이메일' }), 'member@example.test');

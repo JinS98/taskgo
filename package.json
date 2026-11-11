@@ -15,6 +15,7 @@
     "typecheck": "npm run typecheck -w @taskgo/web && npm run typecheck -w @taskgo/functions",
     "lint": "npm run lint -w @taskgo/web",
     "test:ui": "npm run test:ui -w @taskgo/web",
+    "test:chat": "npm run verify:chat -w @taskgo/web",
     "emulators": "npm run build:functions && npm run prepare:emulator && firebase emulators:start --only auth,firestore,functions --project demo-taskgo",
     "test:firebase": "firebase emulators:exec --only auth,firestore --project demo-taskgo \"npm run verify:firebase -w @taskgo/web\"",
     "test:auth": "npm run build:functions && npm run prepare:emulator && firebase emulators:exec --only auth,firestore,functions --project demo-taskgo \"npm run verify:auth -w @taskgo/web\"",

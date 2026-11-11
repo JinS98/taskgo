@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { WorkspaceLayout } from './components/layout/WorkspaceLayout';
-import { getConversationName } from './features/chat/demoConversations';
+import { ChatPanel } from './features/chat/ChatPanel';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
 import type { AppView } from './types/domain';
 import styles from './App.module.scss';
@@ -24,24 +24,16 @@ const viewCopy: Record<Exclude<AppView, 'chat' | 'workspace'>, { eyebrow: string
   },
 };
 
-export default function App({ accountControls, workspaceName, canManageWorkspace = false, workspaceManagement }: { accountControls?: ReactNode; workspaceName?: string; canManageWorkspace?: boolean; workspaceManagement?: ReactNode }) {
+export default function App({ accountControls, workspaceId, workspaceName, userId, senderName, canManageWorkspace = false, workspaceManagement }: { accountControls?: ReactNode; workspaceId?: string; workspaceName?: string; userId?: string; senderName?: string; canManageWorkspace?: boolean; workspaceManagement?: ReactNode }) {
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
 
   const showManagement = activeView === 'workspace' && canManageWorkspace;
-  const previewView = activeView === 'workspace' ? 'chat' : activeView;
-  const selectedName = getConversationName(selectedConversation);
-  const currentView = previewView === 'chat'
-    ? {
-      eyebrow: selectedConversation.kind === 'channel' ? 'CHANNEL PREVIEW' : 'DIRECT MESSAGE PREVIEW',
-      title: `${selectedConversation.kind === 'channel' ? '# ' : ''}${selectedName}`,
-      description: `${selectedName} ${selectedConversation.kind === 'channel' ? '채널' : 'DM'}의 대화가 이곳에 표시됩니다. 현재는 샘플 목록을 탐색할 수 있습니다.`,
-    }
-    : viewCopy[previewView];
+  const currentView = activeView === 'board' || activeView === 'calendar' ? viewCopy[activeView] : null;
 
   return (
     <WorkspaceLayout accountControls={accountControls} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace}>
-      {showManagement ? workspaceManagement : <>
+      {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : currentView && <>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>
         <h1 id="hero-title" aria-live="polite">{currentView.title}</h1>
