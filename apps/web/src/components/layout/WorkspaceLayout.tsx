@@ -10,6 +10,7 @@ import styles from './WorkspaceLayout.module.scss';
 
 interface WorkspaceLayoutProps {
   children: ReactNode;
+  accountControls?: ReactNode;
 }
 
 const viewTabs: { id: AppView; label: string }[] = [
@@ -18,7 +19,7 @@ const viewTabs: { id: AppView; label: string }[] = [
   { id: 'calendar', label: '캘린더' },
 ];
 
-export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ children, accountControls }: WorkspaceLayoutProps) {
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
   const setView = useWorkspaceNavigationStore((state) => state.setView);
@@ -118,7 +119,10 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
       <div className={styles.mainColumn}>
         <header className={styles.topbar}>
           <span>{currentTitle}</span>
-          <span className={styles.previewBadge}>샘플 화면</span>
+          <div className={styles.topbarActions}>
+            <span className={styles.previewBadge}>샘플 화면</span>
+            {accountControls}
+          </div>
         </header>
         <main id="main-content" className={styles.main}>
           {children}

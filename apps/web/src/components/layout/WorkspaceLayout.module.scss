@@ -227,6 +227,12 @@
   font-size: 11px;
 }
 
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .main {
   display: flex;
   width: 100%;

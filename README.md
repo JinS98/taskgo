@@ -4,7 +4,7 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 6일차 Firebase 개발 환경 준비.** 샘플 채널·DM과 화면 전환을 확인할 수 있고, Firebase Auth·Firestore 연결 및 로컬 에뮬레이터를 설정했습니다. 로그인 화면과 실제 메시지·업무·AI 기능은 아직 구현되지 않았으며 `apps/socket-server`, `functions`는 설계용 폴더입니다.
+> **현재 상태: 7일차 인증 화면 구현.** 이메일·비밀번호 가입·인증·로그인과 Google 로그인, 로그아웃, 보호 화면을 사용할 수 있습니다. 워크스페이스는 샘플 채널·DM을 보여주며 실제 메시지·업무·AI 기능은 아직 구현되지 않았습니다. `apps/socket-server`, `functions`는 설계용 폴더입니다.
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand + FullCalendar (예정)
@@ -13,14 +13,14 @@
 - 서버 로직: Cloud Functions + 예약 작업 (예정)
 - 개발: Firebase Emulator Suite, 로컬 Socket.io
 
-## 실행 (사이드바 동작 미리보기)
+## 실행
 
 ```bash
 npm install
 npm run dev:web
 ```
 
-Node.js 20.19+ 또는 22.13+ 권장. Firebase 설정 없이도 샘플 목록과 화면 전환을 확인할 수 있습니다. 선택 상태는 앱 실행 중 Zustand 스토어에서 공유되며 새로고침하면 초기화됩니다. 현재 화면은 Firebase 데이터를 요청하지 않습니다.
+Node.js 20.19+ 또는 22.13+ 권장. 실제 Firebase 프로젝트를 사용하려면 `apps/web/.env.local`에 웹 앱 설정을 입력해야 합니다. 설정이 없으면 앱에 누락된 환경 변수 안내가 표시됩니다. 로그인 후 보이는 워크스페이스는 샘플 데이터이며 선택 상태는 앱 실행 중 Zustand 스토어에서 공유됩니다.
 
 ## Firebase 개발 환경
 
@@ -33,7 +33,9 @@ npm run emulators
 npm run dev:web:emulator
 ```
 
-인증 에뮬레이터는 `127.0.0.1:9099`, Firestore는 `127.0.0.1:8080`, 에뮬레이터 UI는 `127.0.0.1:4000`을 사용합니다. 웹 앱의 `emulator` 모드는 [가상 프로젝트 설정](apps/web/.env.emulator)을 사용하므로 실제 Firebase 프로젝트에 접속하지 않습니다. 로그인 UI와 실제 데이터 사용은 7~8일차에 추가합니다.
+인증 에뮬레이터는 `127.0.0.1:9099`, Firestore는 `127.0.0.1:8080`, 에뮬레이터 UI는 `127.0.0.1:4000`을 사용합니다. 웹 앱의 `emulator` 모드는 [가상 프로젝트 설정](apps/web/.env.emulator)을 사용하므로 실제 Firebase 프로젝트에 접속하지 않습니다. 이메일 가입 후 에뮬레이터 UI 로그에 표시되는 확인 링크를 열고 앱의 **인증 확인**을 누릅니다. Google 로그인 버튼은 에뮬레이터의 가상 계정 선택 창을 엽니다. 실제 Firestore 데이터 사용은 8일차부터 추가합니다.
+
+로그인한 계정의 **계정** 메뉴에서 Google 로그인 또는 비밀번호 로그인을 연결할 수 있습니다. 이미 다른 계정에 연결된 로그인 방식은 자동 병합하지 않고 오류를 표시합니다. 비밀번호 추가에는 최근 로그인이 필요할 수 있습니다.
 
 실제 프로젝트 웹 설정은 [환경 변수 예시](apps/web/.env.example)를 `apps/web/.env.local`로 복사해 입력합니다. 이 PC에는 웹 앱 설정이 입력되어 있습니다. `VITE_USE_FIREBASE_EMULATORS=false`일 때만 실제 프로젝트를 사용하며 `.env.local`은 Git에서 제외됩니다.
 
@@ -56,7 +58,7 @@ npx firebase deploy --only auth --config firebase.auth.local.json --project task
 
 ## 환경 변수
 
-웹 앱의 예시는 `apps/web/.env.example`에 있습니다. Firebase 기능을 사용할 때 실제 프로젝트 웹 설정을 `apps/web/.env.local`에 입력합니다. 복사하지 않아도 샘플 화면은 실행됩니다. `.env.local`은 Git에서 제외됩니다.
+웹 앱의 예시는 `apps/web/.env.example`에 있습니다. 실제 프로젝트를 사용할 때 웹 설정을 `apps/web/.env.local`에 입력합니다. `.env.local`은 Git에서 제외됩니다.
 
 `VITE_` 변수는 브라우저 번들에 공개되므로 서버 비밀키를 넣지 않습니다. 소켓 주소의 기본값은 `http://localhost:3001`이며, 실제 서버 연결은 10일차에 추가합니다.
 
@@ -68,6 +70,7 @@ npm run lint
 npm run build:web
 npm run test:ui
 npm run test:firebase
+npm run test:auth
 ```
 
 ## 문서

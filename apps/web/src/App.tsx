@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { WorkspaceLayout } from './components/layout/WorkspaceLayout';
 import { getConversationName } from './features/chat/demoConversations';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
@@ -23,7 +24,7 @@ const viewCopy: Record<Exclude<AppView, 'chat'>, { eyebrow: string; title: strin
   },
 };
 
-export default function App() {
+export default function App({ accountControls }: { accountControls?: ReactNode }) {
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
 
@@ -37,7 +38,7 @@ export default function App() {
     : viewCopy[activeView];
 
   return (
-    <WorkspaceLayout>
+    <WorkspaceLayout accountControls={accountControls}>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>
         <h1 id="hero-title" aria-live="polite">{currentView.title}</h1>

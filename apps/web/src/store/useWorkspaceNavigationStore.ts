@@ -7,6 +7,7 @@ interface WorkspaceNavigationState {
   selectedConversation: ConversationSelection;
   setView: (view: AppView) => void;
   selectConversation: (conversation: ConversationSelection) => void;
+  resetNavigation: () => void;
 }
 
 export const useWorkspaceNavigationStore = create<WorkspaceNavigationState>()((set) => ({
@@ -17,4 +18,5 @@ export const useWorkspaceNavigationStore = create<WorkspaceNavigationState>()((s
     activeView: 'chat',
     selectedConversation,
   }),
+  resetNavigation: () => set({ activeView: 'chat', selectedConversation: initialConversation }),
 }));

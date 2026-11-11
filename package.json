@@ -13,7 +13,8 @@
     "lint": "npm run lint -w @taskgo/web",
     "test:ui": "npm run test:ui -w @taskgo/web",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-taskgo",
-    "test:firebase": "firebase emulators:exec --only auth,firestore --project demo-taskgo \"npm run verify:firebase -w @taskgo/web\""
+    "test:firebase": "firebase emulators:exec --only auth,firestore --project demo-taskgo \"npm run verify:firebase -w @taskgo/web\"",
+    "test:auth": "firebase emulators:exec --only auth,firestore --project demo-taskgo \"npm run verify:auth -w @taskgo/web\""
   },
   "devDependencies": {
     "firebase-tools": "^15.35.0"
