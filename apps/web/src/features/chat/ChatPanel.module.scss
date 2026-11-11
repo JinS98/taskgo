@@ -4,6 +4,8 @@
 .heading h1 { overflow: hidden; margin: 0 0 5px; font-size: clamp(19px, 2vw, 24px); letter-spacing: -.03em; text-overflow: ellipsis; white-space: nowrap; }
 .heading p { margin: 0; color: var(--muted); font-size: 12px; }
 .previewTag { flex: 0 0 auto; padding: 7px 10px; border: 1px solid #615a83; border-radius: 999px; color: #cec3ff; font-size: 11px; font-weight: 700; }
+.connectionError { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px clamp(20px, 4vw, 48px); background: #61323f; color: #ffe3e5; font-size: 13px; }
+.connectionError button { flex: 0 0 auto; padding: 6px 10px; border: 1px solid #c996a2; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: 700; }
 .messages { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 28px clamp(20px, 4vw, 48px); scrollbar-width: thin; scrollbar-color: #626083 var(--page); }
 .messages::-webkit-scrollbar { width: 10px; }
 .messages::-webkit-scrollbar-track { background: var(--page); }

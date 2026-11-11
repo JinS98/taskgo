@@ -12,8 +12,12 @@ export interface DemoDirectMessage {
 }
 
 export type ConversationSelection =
-  | { kind: 'channel'; id: ChannelId }
-  | { kind: 'dm'; id: DmRoomId };
+  | { kind: 'channel'; id: ChannelId; name?: string }
+  | { kind: 'dm'; id: DmRoomId; name?: string };
+
+export function defaultChannelId(workspaceId: string): string {
+  return `general_${workspaceId}`;
+}
 
 export const demoChannels: DemoChannel[] = [
   { id: 'general', name: '전체' },
@@ -32,6 +36,7 @@ export const initialConversation: ConversationSelection = {
 };
 
 export function getConversationName(selection: ConversationSelection): string {
+  if (selection.name) return selection.name;
   const items = selection.kind === 'channel' ? demoChannels : demoDirectMessages;
   return items.find(({ id }) => id === selection.id)?.name ?? '대화';
 }

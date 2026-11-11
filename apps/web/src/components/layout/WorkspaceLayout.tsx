@@ -2,6 +2,8 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import {
   demoChannels,
   demoDirectMessages,
+  type DemoChannel,
+  type DemoDirectMessage,
 } from '../../features/chat/demoConversations';
 import { useWorkspaceNavigationStore } from '../../store/useWorkspaceNavigationStore';
 import type { AppView } from '../../types/domain';
@@ -12,6 +14,10 @@ interface WorkspaceLayoutProps {
   accountControls?: ReactNode;
   workspaceName?: string;
   canManageWorkspace?: boolean;
+  liveChat?: boolean;
+  channels?: DemoChannel[];
+  directMessages?: DemoDirectMessage[];
+  conversationError?: string;
 }
 
 const viewTabs: { id: AppView; label: string }[] = [
@@ -30,13 +36,15 @@ function NavigationIcon({ view }: { view: AppView }) {
   return <span className={styles.navIcon}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[view]}</svg></span>;
 }
 
-export function WorkspaceLayout({ children, accountControls, workspaceName, canManageWorkspace = false }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ children, accountControls, workspaceName, canManageWorkspace = false, liveChat = false, channels, directMessages, conversationError }: WorkspaceLayoutProps) {
   const mainRef = useRef<HTMLElement>(null);
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
   const setView = useWorkspaceNavigationStore((state) => state.setView);
   const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
   const currentTitle = activeView === 'workspace' ? '워크스페이스 관리' : viewTabs.find(({ id }) => id === activeView)?.label;
+  const visibleChannels = liveChat ? channels ?? [] : demoChannels;
+  const visibleDirectMessages = liveChat ? directMessages ?? [] : demoDirectMessages;
 
   useEffect(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, [activeView, workspaceName]);
 
@@ -90,13 +98,13 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
           <section aria-labelledby="channels-heading">
             <h2 id="channels-heading" className={styles.sectionLabel}>채널</h2>
             <ul className={styles.conversationList}>
-              {demoChannels.map(({ id, name }) => (
+              {visibleChannels.map(({ id, name }) => (
                 <li key={id}>
                   <button
                     className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id ? styles.active : ''}`}
                     type="button"
                     aria-pressed={activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id}
-                    onClick={() => selectConversation({ kind: 'channel', id })}
+                    onClick={() => selectConversation(liveChat ? { kind: 'channel', id, name } : { kind: 'channel', id })}
                   >
                     <span className={styles.channelIcon} aria-hidden="true">#</span>
                     <span>{name}</span>
@@ -109,13 +117,13 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
           <section aria-labelledby="dm-heading">
             <h2 id="dm-heading" className={styles.sectionLabel}>DM</h2>
             <ul className={styles.conversationList}>
-              {demoDirectMessages.map(({ id, name, initials }) => (
+              {visibleDirectMessages.map(({ id, name, initials }) => (
                 <li key={id}>
                   <button
                     className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id ? styles.active : ''}`}
                     type="button"
                     aria-pressed={activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id}
-                    onClick={() => selectConversation({ kind: 'dm', id })}
+                    onClick={() => selectConversation(liveChat ? { kind: 'dm', id, name } : { kind: 'dm', id })}
                   >
                     <span className={styles.avatar} aria-hidden="true">{initials}</span>
                     <span>{name}</span>
@@ -123,7 +131,9 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
                 </li>
               ))}
             </ul>
+            {liveChat && visibleDirectMessages.length === 0 && <p className={styles.sectionLabel}>아직 DM이 없습니다.</p>}
           </section>
+          {conversationError && <p role="alert" className={styles.sectionLabel}>{conversationError}</p>}
         </div>
 
         <p className={styles.sidebarFooter}>대화가 업무가 되는 순간</p>
@@ -131,7 +141,7 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
 
       <div className={styles.mainColumn}>
         <header className={styles.topbar}>
-          <div className={styles.topbarContext}><span className={styles.topbarTitle}>{currentTitle}</span>{activeView !== 'workspace' && <span className={styles.previewBadge}>샘플 화면</span>}</div>
+          <div className={styles.topbarContext}><span className={styles.topbarTitle}>{currentTitle}</span>{!liveChat && activeView !== 'workspace' && <span className={styles.previewBadge}>샘플 화면</span>}</div>
           <div className={styles.topbarActions}>
             {accountControls}
           </div>

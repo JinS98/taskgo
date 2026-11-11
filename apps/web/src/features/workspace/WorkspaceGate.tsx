@@ -180,7 +180,7 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
 
   return (
     <div className={styles.shell}>
-      <App workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={user.email ?? '나'} canManageWorkspace={selected.role === 'owner'} accountControls={<>
+      <App auth={auth} db={db} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={user.email ?? '나'} canManageWorkspace={selected.role === 'owner'} accountControls={<>
         <div className={styles.workspacePicker} ref={pickerRef}>
           <button ref={pickerButtonRef} type="button" aria-label="워크스페이스 선택" aria-expanded={pickerOpen} aria-controls="workspace-options" onClick={() => setPickerOpen((open) => !open)}>
             <span className={styles.pickerIcon} aria-hidden="true">{selected.name.charAt(0).toUpperCase()}</span>

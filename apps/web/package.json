@@ -13,13 +13,16 @@
     "verify:chat": "node scripts/verify-chat.mjs",
     "verify:firebase": "node scripts/verify-firebase.mjs",
     "verify:auth": "node scripts/verify-auth.mjs",
-    "verify:workspace": "node scripts/verify-workspace.mjs"
+    "verify:workspace": "node scripts/verify-workspace.mjs",
+    "verify:live-chat": "node scripts/verify-live-chat.mjs"
   },
   "dependencies": {
+    "@taskgo/contracts": "0.0.1",
     "firebase": "^11.10.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.18.5",
+    "socket.io-client": "^4.8.4",
     "zustand": "^5.1.0"
   },
   "devDependencies": {
@@ -30,6 +33,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.0",
+    "playwright-core": "^1.65.0",
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^16.5.0",

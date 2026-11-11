@@ -26,4 +26,4 @@ export function getFirebaseClientConfig(): FirebaseClientConfig {
 
 export const useFirebaseEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
 
-export const socketUrl = import.meta.env.VITE_SOCKET_URL?.trim() || 'http://localhost:3001';
+export const socketUrl = import.meta.env.VITE_SOCKET_URL?.trim() || 'http://127.0.0.1:3001';

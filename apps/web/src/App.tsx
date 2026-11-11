@@ -1,6 +1,11 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import type { Auth } from 'firebase/auth';
+import type { Firestore } from 'firebase/firestore';
 import { WorkspaceLayout } from './components/layout/WorkspaceLayout';
 import { ChatPanel } from './features/chat/ChatPanel';
+import { LiveChatPanel } from './features/chat/LiveChatPanel';
+import { defaultChannelId, type ConversationSelection } from './features/chat/demoConversations';
+import { useWorkspaceConversations } from './features/chat/useWorkspaceConversations';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
 import type { AppView } from './types/domain';
 import styles from './App.module.scss';
@@ -24,16 +29,31 @@ const viewCopy: Record<Exclude<AppView, 'chat' | 'workspace'>, { eyebrow: string
   },
 };
 
-export default function App({ accountControls, workspaceId, workspaceName, userId, senderName, canManageWorkspace = false, workspaceManagement }: { accountControls?: ReactNode; workspaceId?: string; workspaceName?: string; userId?: string; senderName?: string; canManageWorkspace?: boolean; workspaceManagement?: ReactNode }) {
+export default function App({ accountControls, auth, db, workspaceId, workspaceName, userId, senderName, canManageWorkspace = false, workspaceManagement }: { accountControls?: ReactNode; auth?: Auth; db?: Firestore; workspaceId?: string; workspaceName?: string; userId?: string; senderName?: string; canManageWorkspace?: boolean; workspaceManagement?: ReactNode }) {
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
+  const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
+  const liveChat = Boolean(auth && db && workspaceId && userId);
+  const { channels, directMessages, memberEmails, error: conversationError } = useWorkspaceConversations(db, workspaceId, userId);
+
+  useEffect(() => {
+    if (liveChat && workspaceId) selectConversation({ kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' });
+  }, [liveChat, selectConversation, userId, workspaceId]);
+
+  const defaultConversation: ConversationSelection | null = workspaceId ? { kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' } : null;
+  const selectedAvailable = selectedConversation.kind === 'channel'
+    ? channels.some((item) => item.id === selectedConversation.id)
+    : directMessages.some((item) => item.id === selectedConversation.id);
+  const activeConversation = liveChat && !selectedAvailable && defaultConversation ? defaultConversation : selectedConversation;
 
   const showManagement = activeView === 'workspace' && canManageWorkspace;
   const currentView = activeView === 'board' || activeView === 'calendar' ? viewCopy[activeView] : null;
 
   return (
-    <WorkspaceLayout accountControls={accountControls} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace}>
-      {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : currentView && <>
+    <WorkspaceLayout accountControls={accountControls} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
+      {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && workspaceId && userId
+        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} />
+        : <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : currentView && <>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>
         <h1 id="hero-title" aria-live="polite">{currentView.title}</h1>

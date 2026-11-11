@@ -32,11 +32,22 @@ export function createFirebaseSocketServices(projectId: string): SocketServices 
       }
     },
     async canAccessRoom(uid: string, target: RoomTarget) {
-      const member = await db.doc(`workspaces/${target.workspaceId}/members/${uid}`).get();
+      const memberRef = db.doc(`workspaces/${target.workspaceId}/members/${uid}`);
+      const member = await memberRef.get();
       if (!member.exists) return false;
       if (target.kind === 'channel') {
-        const channel = await db.doc(`channels/${target.roomId}`).get();
-        return channel.exists && channel.get('workspaceId') === target.workspaceId;
+        const channelRef = db.doc(`channels/${target.roomId}`);
+        const channel = await channelRef.get();
+        if (channel.exists) return channel.get('workspaceId') === target.workspaceId;
+        if (target.roomId !== `general_${target.workspaceId}`) return false;
+        return db.runTransaction(async (transaction) => {
+          const currentMember = await transaction.get(memberRef);
+          const currentChannel = await transaction.get(channelRef);
+          if (!currentMember.exists) return false;
+          if (currentChannel.exists) return currentChannel.get('workspaceId') === target.workspaceId;
+          transaction.create(channelRef, { workspaceId: target.workspaceId, name: '전체', createdAt: Timestamp.now() });
+          return true;
+        });
       }
       const room = await db.doc(`dmRooms/${target.roomId}`).get();
       return room.exists && room.get('workspaceId') === target.workspaceId
