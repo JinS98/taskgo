@@ -55,7 +55,7 @@ export function AccountMenu({ auth, user, onRefresh }: AccountMenuProps) {
 
   return (
     <div className={styles.container} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }}>
-      <button className={styles.trigger} type="button" aria-expanded={open} aria-controls="account-menu-panel" onClick={() => setOpen((value) => !value)}>계정</button>
+      <button className={styles.trigger} type="button" aria-expanded={open} aria-controls="account-menu-panel" onClick={() => setOpen((value) => !value)}><span className={styles.avatar} aria-hidden="true">{user.email?.charAt(0).toUpperCase() || '?'}</span><span>계정</span></button>
       {open && (
         <section className={styles.panel} id="account-menu-panel" aria-label="계정 설정">
           <p className={styles.label}>로그인한 계정</p>

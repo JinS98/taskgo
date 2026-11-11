@@ -13,6 +13,10 @@ interface Membership { workspaceId: string; name: string; role: 'owner' | 'membe
 interface Invite { inviteId: string; email: string; status: string; expiresAt: string }
 interface Member { uid: string; email: string; role: 'owner' | 'member' }
 
+function PickerMark({ selected = false }: { selected?: boolean }) {
+  return <svg className={styles.pickerMark} aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={selected ? 'M4.5 10l3.5 3.5 7.5-7.5' : 'm5 7.5 5 5 5-5'} /></svg>;
+}
+
 export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: Auth; user: User; db: Firestore; functions: Functions; onRefresh: () => Promise<void> }) {
   const [params, setParams] = useSearchParams();
   const selectedWorkspaceIdRef = useRef('');
@@ -176,7 +180,23 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
 
   return (
     <div className={styles.shell}>
-      <App workspaceName={selected.name} canManageWorkspace={selected.role === 'owner'} accountControls={<><div className={styles.workspacePicker} ref={pickerRef}><button ref={pickerButtonRef} type="button" aria-label="워크스페이스 선택" aria-expanded={pickerOpen} aria-controls="workspace-options" onClick={() => setPickerOpen((open) => !open)}><span className={styles.pickerIcon} aria-hidden="true">{selected.name.charAt(0).toUpperCase()}</span><span className={styles.pickerName}>{selected.name}</span><span className={styles.pickerChevron} aria-hidden="true">⌄</span></button>{pickerOpen && <div id="workspace-options" className={styles.pickerOptions} role="group" aria-label="워크스페이스 목록">{workspaces.map((item) => <button type="button" key={item.workspaceId} className={item.workspaceId === selected.workspaceId ? styles.selectedOption : ''} aria-current={item.workspaceId === selected.workspaceId ? 'true' : undefined} onClick={() => switchWorkspace(item.workspaceId)}><span className={styles.pickerIcon} aria-hidden="true">{item.name.charAt(0).toUpperCase()}</span><span>{item.name}</span>{item.workspaceId === selected.workspaceId && <span className={styles.optionCheck} aria-hidden="true">✓</span>}</button>)}</div>}</div><AccountMenu auth={auth} user={user} onRefresh={onRefresh} /></>} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
+      <App workspaceName={selected.name} canManageWorkspace={selected.role === 'owner'} accountControls={<>
+        <div className={styles.workspacePicker} ref={pickerRef}>
+          <button ref={pickerButtonRef} type="button" aria-label="워크스페이스 선택" aria-expanded={pickerOpen} aria-controls="workspace-options" onClick={() => setPickerOpen((open) => !open)}>
+            <span className={styles.pickerIcon} aria-hidden="true">{selected.name.charAt(0).toUpperCase()}</span>
+            <span className={styles.pickerName}>{selected.name}</span>
+            <PickerMark />
+          </button>
+          {pickerOpen && <div id="workspace-options" className={styles.pickerOptions} role="group" aria-label="워크스페이스 목록">
+            {workspaces.map((item) => <button type="button" key={item.workspaceId} className={item.workspaceId === selected.workspaceId ? styles.selectedOption : ''} aria-current={item.workspaceId === selected.workspaceId ? 'true' : undefined} onClick={() => switchWorkspace(item.workspaceId)}>
+              <span className={styles.pickerIcon} aria-hidden="true">{item.name.charAt(0).toUpperCase()}</span>
+              <span>{item.name}</span>
+              {item.workspaceId === selected.workspaceId && <PickerMark selected />}
+            </button>)}
+          </div>}
+        </div>
+        <AccountMenu auth={auth} user={user} onRefresh={onRefresh} />
+      </>} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
         <div className={styles.managementHeading}><p className={styles.eyebrow}>WORKSPACE</p><h1>{selected.name} 관리</h1><p>멤버와 초대 현황을 확인하고 새 멤버를 초대하세요.</p></div>
         <div className={styles.managementGrid}>
           <section className={styles.managementCard} aria-labelledby="invite-title"><div className={styles.cardHeading}><h2 id="invite-title">멤버 초대</h2></div><p className={styles.helper}>이메일 주소로 초대 링크를 보냅니다. 상대방은 같은 주소로 로그인해 수락할 수 있습니다.</p>

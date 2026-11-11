@@ -45,14 +45,16 @@
 .workspacePicker { position: relative; min-width: 0; }
 .workspacePicker > button, .pickerOptions button { display: flex; align-items: center; gap: 9px; color: #f5f3ff; font: inherit; cursor: pointer; }
 .workspacePicker > button {
-  max-width: min(250px, 30vw); min-height: 38px; padding: 5px 9px;
-  border: 1px solid #555a79; border-radius: 10px; background: #2b304a;
+  width: clamp(150px, 18vw, 240px); min-height: 40px; padding: 5px 9px;
+  border: 1px solid #555a79; border-radius: 11px; background: #2b304a;
 }
-.workspacePicker > button:hover, .workspacePicker > button[aria-expanded='true'] { border-color: var(--accent); background: #343751; }
+.workspacePicker > button:hover, .workspacePicker > button[aria-expanded='true'] { border-color: #78729d; background: #343751; }
 .workspacePicker button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pickerName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pickerIcon { display: grid; flex: 0 0 25px; place-items: center; height: 25px; border-radius: 7px; background: var(--accent); color: var(--sidebar); font-size: 12px; font-weight: 800; }
-.pickerChevron { margin-left: auto; color: var(--accent); font-size: 18px; line-height: 1; }
+.pickerMark { flex: 0 0 18px; width: 18px; height: 18px; margin-left: auto; color: var(--accent); }
+.workspacePicker > button .pickerMark { transition: transform .18s ease; }
+.workspacePicker > button[aria-expanded='true'] .pickerMark { transform: rotate(180deg); }
 .pickerOptions {
   position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
   width: max(100%, 220px); max-width: min(340px, calc(100vw - 32px)); max-height: min(360px, 60dvh); overflow-y: auto;
@@ -61,7 +63,6 @@
 .pickerOptions button { width: 100%; min-height: 40px; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
 .pickerOptions button:hover, .pickerOptions .selectedOption { background: #474169; }
 .pickerOptions button > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.optionCheck { margin-left: auto; color: var(--accent); font-weight: 800; }
 .management { width: 100%; min-width: 0; }
 .managementHeading { margin-bottom: 30px; }
 .managementHeading h1 { margin: 10px 0; font-size: clamp(28px, 4vw, 42px); letter-spacing: -.04em; }
@@ -92,5 +93,5 @@
 }
 @media (max-width: 760px) {
   .managementCard { padding: 20px; }
-  .workspacePicker > button { max-width: 132px; }
+  .workspacePicker > button { width: min(240px, 52vw); }
 }
