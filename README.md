@@ -4,7 +4,7 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 8일차 워크스페이스·초대 로컬 구현.** 인증 후 워크스페이스를 만들고 Gmail 초대 링크를 발급·수락·철회할 수 있습니다. 초대 메일의 실제 발송과 Functions 배포는 SMTP·Blaze 설정 전이며, 채팅·업무 화면은 샘플 데이터입니다.
+> **현재 상태: 워크스페이스 생성은 실제 Firebase 프로젝트에서 사용 가능, 초대는 로컬 구현.** 인증 후 공간을 만들면 생성자가 장이 됩니다. Gmail 초대 링크의 실제 메일 발송과 Functions 배포는 SMTP·Blaze 설정 전이며, 채팅·업무 화면은 샘플 데이터입니다.
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand + FullCalendar (예정)
@@ -26,7 +26,7 @@ Node.js 22.13+와 Java 21이 필요합니다. 이메일 가입 후 에뮬레이�
 
 ## Firebase 개발 환경
 
-실제 Firebase 프로젝트는 `taskgo-jins98`, 웹 앱은 `taskgo-web`입니다. 이메일·비밀번호와 Google 로그인 공급자를 활성화했고, Cloud Firestore 기본 데이터베이스는 서울(`asia-northeast3`)에 생성했습니다. 저장소의 [Firestore 규칙](firestore.rules)은 멤버십·DM 참여자 읽기를 허용하고 모든 클라이언트 쓰기를 차단합니다. 실제 프로젝트에는 아직 6일차의 전체 차단 규칙이 배포된 상태이며 Functions도 배포하지 않았습니다.
+실제 Firebase 프로젝트는 `taskgo-jins98`, 웹 앱은 `taskgo-web`입니다. 이메일·비밀번호와 Google 로그인 공급자를 활성화했고, Cloud Firestore 기본 데이터베이스는 서울(`asia-northeast3`)에 생성했습니다. [Firestore 규칙](firestore.rules)은 확인된 사용자의 워크스페이스·장 멤버십·본인 목록을 일괄 생성할 때만 클라이언트 쓰기를 허용합니다. 초대·채팅·업무 쓰기는 계속 차단합니다. 이 규칙은 실제 프로젝트에 배포했지만 초대용 Functions는 아직 배포하지 않았습니다.
 
 로컬 에뮬레이터는 Java 21이 필요합니다. 터미널 두 개에서 실행합니다.
 
@@ -38,6 +38,8 @@ npm run dev:web:emulator
 인증 에뮬레이터는 `127.0.0.1:9099`, Firestore는 `127.0.0.1:8080`, Functions는 `127.0.0.1:5001`, 에뮬레이터 UI는 `127.0.0.1:4000`을 사용합니다. 웹 앱의 `emulator` 모드는 [가상 프로젝트 설정](apps/web/.env.emulator)을 사용하므로 실제 Firebase 프로젝트에 접속하지 않습니다. Google 로그인 버튼은 에뮬레이터의 가상 계정 선택 창을 엽니다.
 
 로그인한 계정의 **계정** 메뉴에서 Google 로그인 또는 비밀번호 로그인을 연결할 수 있습니다. 이미 다른 계정에 연결된 로그인 방식은 자동 병합하지 않고 오류를 표시합니다. 비밀번호 추가에는 최근 로그인이 필요할 수 있습니다.
+
+실제 프로젝트 설정으로 `npm run dev:web`을 실행하면 워크스페이스 만들기까지 사용할 수 있습니다. 초대 메일 보내기는 Functions 배포 전까지 사용할 수 없으며, 워크스페이스를 만든 직후 자동으로 초대가 발송되지는 않습니다.
 
 실제 프로젝트 웹 설정은 [환경 변수 예시](apps/web/.env.example)를 `apps/web/.env.local`로 복사해 입력합니다. 이 PC에는 웹 앱 설정이 입력되어 있습니다. `VITE_USE_FIREBASE_EMULATORS=false`일 때만 실제 프로젝트를 사용하며 `.env.local`은 Git에서 제외됩니다.
 

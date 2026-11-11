@@ -42,19 +42,6 @@ function inviteLink(inviteId: string, token: string): string {
   return url.toString();
 }
 
-export const createWorkspace = onCall({ region }, async (request) => {
-  const user = await verifiedUser(request);
-  const name = field(request.data, 'name');
-  if (name.length < 2 || name.length > 80) throw new HttpsError('invalid-argument', '워크스페이스 이름은 2~80자로 입력해 주세요.');
-  const workspace = db.collection('workspaces').doc();
-  const batch = db.batch();
-  batch.create(workspace, { name, ownerId: user.uid, createdAt: FieldValue.serverTimestamp() });
-  batch.create(workspace.collection('members').doc(user.uid), { uid: user.uid, email: user.email!.toLowerCase(), role: 'owner', joinedAt: FieldValue.serverTimestamp() });
-  batch.create(db.doc(`users/${user.uid}/workspaces/${workspace.id}`), { workspaceId: workspace.id, name, role: 'owner', joinedAt: FieldValue.serverTimestamp() });
-  await batch.commit();
-  return { workspaceId: workspace.id };
-});
-
 export const inviteMember = onCall({ region, secrets: [smtpUrl] }, async (request) => {
   const user = await verifiedUser(request);
   const workspaceId = field(request.data, 'workspaceId');

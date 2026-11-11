@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { initializeApp as initializeAdminApp, deleteApp as deleteAdminApp } from 'firebase-admin/app';
 import { getFirestore as getAdminFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { applyActionCode, connectAuthEmulator, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, reload, sendEmailVerification, signInWithCredential } from 'firebase/auth';
+import { applyActionCode, connectAuthEmulator, createUserWithEmailAndPassword, getAuth, getIdToken, GoogleAuthProvider, reload, sendEmailVerification, signInWithCredential } from 'firebase/auth';
+import { collection, connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 
@@ -19,6 +20,8 @@ async function account(name, email, verify = true) {
   apps.push(app);
   const auth = getAuth(app);
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  const db = getFirestore(app);
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
   const functions = getFunctions(app, 'asia-northeast3');
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
   const { user } = await createUserWithEmailAndPassword(auth, email, 'StrongPass123!');
@@ -31,7 +34,18 @@ async function account(name, email, verify = true) {
     await reload(user);
   }
   const call = (name, data) => httpsCallable(functions, name)(data);
-  return { user, call };
+  return { user, auth, db, call };
+}
+
+async function createWorkspace(account, name) {
+  await getIdToken(account.user, true);
+  const workspace = doc(collection(account.db, 'workspaces'));
+  const batch = writeBatch(account.db);
+  batch.set(workspace, { name, ownerId: account.user.uid, createdAt: serverTimestamp() });
+  batch.set(doc(account.db, 'workspaces', workspace.id, 'members', account.user.uid), { uid: account.user.uid, email: account.user.email, role: 'owner', joinedAt: serverTimestamp() });
+  batch.set(doc(account.db, 'users', account.user.uid, 'workspaces', workspace.id), { workspaceId: workspace.id, name, role: 'owner', joinedAt: serverTimestamp() });
+  await batch.commit();
+  return workspace.id;
 }
 
 async function rejected(promise, code) {
@@ -44,17 +58,19 @@ try {
   apps.push(googleApp);
   const googleAuth = getAuth(googleApp);
   connectAuthEmulator(googleAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  const googleFunctions = getFunctions(googleApp, 'asia-northeast3');
-  connectFunctionsEmulator(googleFunctions, '127.0.0.1', 5001);
+  const googleDb = getFirestore(googleApp);
+  connectFirestoreEmulator(googleDb, '127.0.0.1', 8080);
   const googleUser = (await signInWithCredential(googleAuth, GoogleAuthProvider.credential(JSON.stringify({ sub: 'workspace-google-owner', email: 'google-owner@gmail.com', email_verified: true })))).user;
-  const googleWorkspaceId = (await httpsCallable(googleFunctions, 'createWorkspace')({ name: 'Google Team' })).data.workspaceId;
+  const googleWorkspaceId = await createWorkspace({ user: googleUser, db: googleDb }, 'Google Team');
   assert.equal((await adminDb.doc(`workspaces/${googleWorkspaceId}`).get()).get('ownerId'), googleUser.uid);
   const guest = await account('guest', 'guest@gmail.com');
   const stranger = await account('stranger', 'stranger@gmail.com');
   const unverified = await account('unverified', 'unverified@gmail.com', false);
 
-  await rejected(unverified.call('createWorkspace', { name: 'Unauthorized' }), 'permission-denied');
-  const { workspaceId } = (await owner.call('createWorkspace', { name: 'Taskgo Team' })).data;
+  await assert.rejects(createWorkspace(unverified, 'Unauthorized'), (error) => error.code === 'permission-denied');
+  const workspaceId = await createWorkspace(owner, 'Taskgo Team');
+  assert.equal((await adminDb.collection('workspaceInvites').get()).size, 0);
+  await assert.rejects(setDoc(doc(collection(owner.db, 'workspaces')), { name: 'Incomplete', ownerId: owner.user.uid, createdAt: serverTimestamp() }), (error) => error.code === 'permission-denied');
   assert.equal((await adminDb.doc(`workspaces/${workspaceId}`).get()).get('ownerId'), owner.user.uid);
   assert.equal((await adminDb.doc(`workspaces/${workspaceId}/members/${owner.user.uid}`).get()).get('role'), 'owner');
 

@@ -47,6 +47,7 @@ try {
   await user.type(screen.getByLabelText('워크스페이스 이름'), 'Email Team');
   await user.click(screen.getByRole('button', { name: '만들기' }));
   await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
+  await screen.findByText(/워크스페이스를 만들었습니다\. 멤버 초대는/);
 
   await user.click(screen.getByRole('button', { name: '계정' }));
   assert.match(screen.getByLabelText('계정 설정').textContent, /이메일·비밀번호/);
@@ -81,6 +82,7 @@ try {
   await user.type(screen.getByLabelText('워크스페이스 이름'), 'Google Team');
   await user.click(screen.getByRole('button', { name: '만들기' }));
   await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
+  await screen.findByText(/워크스페이스를 만들었습니다\. 멤버 초대는/);
   const googleUid = services.auth.currentUser.uid;
 
   await user.click(screen.getByRole('button', { name: '계정' }));

@@ -5,7 +5,7 @@ import type { Functions } from 'firebase/functions';
 import { useSearchParams } from 'react-router';
 import App from '../../App';
 import { AccountMenu } from '../auth/AccountMenu';
-import { callWorkspace, workspaceError } from './workspaceApi';
+import { callWorkspace, createWorkspace, workspaceCreationError, workspaceError } from './workspaceApi';
 import styles from './WorkspaceGate.module.scss';
 
 interface Membership { workspaceId: string; name: string; role: 'owner' | 'member' }
@@ -45,11 +45,11 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
     if (pending) return;
     setPending(true); setError('');
     try {
-      const result = await callWorkspace<{ workspaceId: string }>(auth, functions, 'createWorkspace', { name });
+      const result = await createWorkspace(auth, db, name);
       setCreatedWorkspaceId(result.workspaceId);
       setParams({ workspaceId: result.workspaceId });
       setName('');
-    } catch (cause) { setError(workspaceError(cause)); }
+    } catch (cause) { setError(workspaceCreationError(cause)); }
     finally { setPending(false); }
   }
 
@@ -101,6 +101,7 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
   return (
     <div className={styles.shell}>
       <App accountControls={<><button className={styles.workspaceButton} type="button" onClick={() => setPanelOpen((open) => !open)} aria-expanded={panelOpen}>{selected.name}</button><AccountMenu auth={auth} user={user} onRefresh={onRefresh} /></>} />
+      {createdWorkspaceId === selected.workspaceId && <div className={styles.createdNotice} role="status">워크스페이스를 만들었습니다. 멤버 초대는 워크스페이스 메뉴에서 따로 진행하세요.<button type="button" onClick={() => setCreatedWorkspaceId(null)}>닫기</button></div>}
       {panelOpen && <aside className={styles.panel} aria-label="워크스페이스 관리">
         <h2>워크스페이스</h2>
         <label htmlFor="workspace-select">현재 공간</label>
