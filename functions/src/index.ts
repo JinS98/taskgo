@@ -46,8 +46,8 @@ export const inviteMember = onCall({ region, secrets: [smtpUrl] }, async (reques
   const user = await verifiedUser(request);
   const workspaceId = field(request.data, 'workspaceId');
   const invitedEmail = field(request.data, 'email').toLowerCase();
-  if (!/^[^@\s]+@(gmail\.com|googlemail\.com)$/.test(invitedEmail)) {
-    throw new HttpsError('invalid-argument', 'Gmail 주소만 초대할 수 있습니다.');
+  if (invitedEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(invitedEmail)) {
+    throw new HttpsError('invalid-argument', '올바른 이메일 주소를 입력해 주세요.');
   }
   const workspace = await ownerWorkspace(workspaceId, user.uid);
   if (user.email!.toLowerCase() === invitedEmail) throw new HttpsError('already-exists', '본인은 이미 워크스페이스 멤버입니다.');
@@ -78,7 +78,7 @@ export const inviteMember = onCall({ region, secrets: [smtpUrl] }, async (reques
         from,
         to: invitedEmail,
         subject: `${workspace.get('name')} 워크스페이스 초대`,
-        text: `${workspace.get('name')} 워크스페이스에 초대되었습니다. 7일 안에 링크를 열고 초대받은 Gmail 주소로 로그인하세요.\n\n${link}`,
+        text: `${workspace.get('name')} 워크스페이스에 초대되었습니다. 7일 안에 링크를 열고 초대받은 이메일 주소로 로그인하세요.\n\n${link}`,
       });
     }
   } catch (error) {
@@ -139,7 +139,7 @@ export const acceptInvite = onCall({ region }, async (request) => {
     }
     if (snapshot.get('status') !== 'pending') throw new HttpsError('failed-precondition', '이미 사용하거나 철회한 초대입니다.');
     if ((snapshot.get('expiresAt') as Timestamp).toMillis() <= Date.now()) throw new HttpsError('deadline-exceeded', '만료된 초대입니다.');
-    if (snapshot.get('invitedEmail') !== user.email!.toLowerCase()) throw new HttpsError('permission-denied', '초대받은 Gmail 주소로 로그인해 주세요.');
+    if (snapshot.get('invitedEmail') !== user.email!.toLowerCase()) throw new HttpsError('permission-denied', '초대받은 이메일 주소로 로그인해 주세요.');
     const workspaceId = snapshot.get('workspaceId') as string;
     const workspace = await transaction.get(db.doc(`workspaces/${workspaceId}`));
     if (!workspace.exists) throw new HttpsError('not-found', '워크스페이스가 없습니다.');

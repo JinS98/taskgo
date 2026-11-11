@@ -32,7 +32,7 @@ export function InvitePage({ auth, functions }: { auth: Auth; functions: Functio
       <section className={styles.card}>
         <p className={styles.eyebrow}>WORKSPACE INVITATION</p>
         <h1>워크스페이스 초대</h1>
-        <p>초대받은 Gmail 주소 <strong>{auth.currentUser?.email}</strong>로 로그인했습니다. 가입하려면 아래 버튼을 눌러 주세요.</p>
+        <p>이메일 주소 <strong>{auth.currentUser?.email}</strong>로 로그인했습니다. 초대받은 주소와 같다면 아래 버튼을 눌러 주세요.</p>
         {!inviteId || !token ? <p role="alert">초대 링크가 올바르지 않습니다.</p> : <button type="button" disabled={pending} onClick={accept}>{pending ? '확인 중…' : '초대 수락'}</button>}
         {error && <p className={styles.error} role="alert">{error}</p>}
         <button className={styles.textButton} type="button" onClick={() => navigate('/workspace')}>내 워크스페이스로 이동</button>

@@ -53,7 +53,7 @@ async function rejected(promise, code) {
 }
 
 try {
-  const owner = await account('owner', 'owner@gmail.com');
+  const owner = await account('owner', 'owner@example.com');
   const googleApp = initializeApp({ apiKey: 'demo-taskgo-key', authDomain: 'demo-taskgo.firebaseapp.com', projectId, appId: 'demo-taskgo-web' }, 'google-owner');
   apps.push(googleApp);
   const googleAuth = getAuth(googleApp);
@@ -63,7 +63,7 @@ try {
   const googleUser = (await signInWithCredential(googleAuth, GoogleAuthProvider.credential(JSON.stringify({ sub: 'workspace-google-owner', email: 'google-owner@gmail.com', email_verified: true })))).user;
   const googleWorkspaceId = await createWorkspace({ user: googleUser, db: googleDb }, 'Google Team');
   assert.equal((await adminDb.doc(`workspaces/${googleWorkspaceId}`).get()).get('ownerId'), googleUser.uid);
-  const guest = await account('guest', 'guest@gmail.com');
+  const guest = await account('guest', 'guest@example.com');
   const stranger = await account('stranger', 'stranger@gmail.com');
   const unverified = await account('unverified', 'unverified@gmail.com', false);
 
@@ -75,15 +75,15 @@ try {
   assert.equal((await adminDb.doc(`workspaces/${workspaceId}/members/${owner.user.uid}`).get()).get('role'), 'owner');
 
   await rejected(guest.call('inviteMember', { workspaceId, email: 'stranger@gmail.com' }), 'permission-denied');
-  await rejected(owner.call('inviteMember', { workspaceId, email: 'outside@example.com' }), 'invalid-argument');
-  const first = (await owner.call('inviteMember', { workspaceId, email: 'guest@gmail.com' })).data;
+  await rejected(owner.call('inviteMember', { workspaceId, email: 'invalid-email' }), 'invalid-argument');
+  const first = (await owner.call('inviteMember', { workspaceId, email: 'guest@example.com' })).data;
   assert.ok(first.link);
   const firstToken = new URL(first.link).searchParams.get('token');
   await rejected(guest.call('revokeInvite', { inviteId: first.inviteId }), 'permission-denied');
   await owner.call('revokeInvite', { inviteId: first.inviteId });
   await rejected(guest.call('acceptInvite', { inviteId: first.inviteId, token: firstToken }), 'failed-precondition');
 
-  const second = (await owner.call('inviteMember', { workspaceId, email: 'guest@gmail.com' })).data;
+  const second = (await owner.call('inviteMember', { workspaceId, email: 'guest@example.com' })).data;
   const secondToken = new URL(second.link).searchParams.get('token');
   await rejected(stranger.call('acceptInvite', { inviteId: second.inviteId, token: secondToken }), 'permission-denied');
   await rejected(unverified.call('acceptInvite', { inviteId: second.inviteId, token: secondToken }), 'permission-denied');
@@ -110,6 +110,7 @@ try {
   const workspacePath = `workspaces/${workspaceId}`;
   await assertSucceeds(ownerDb.doc(workspacePath).get());
   await assertSucceeds(guestDb.doc(workspacePath).get());
+  await assertSucceeds(ownerDb.collection(`${workspacePath}/members`).get());
   await assertFails(unknownDb.doc(workspacePath).get());
   await assertFails(publicDb.doc(workspacePath).get());
   await assertSucceeds(guestDb.doc(`users/${guest.user.uid}/workspaces/${workspaceId}`).get());
