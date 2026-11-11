@@ -4,7 +4,7 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 11일차 소켓 인증·룸 권한 검사 완료.** 워크스페이스 생성은 실제 Firebase 프로젝트에서 사용할 수 있고 초대는 로컬 구현입니다. 채팅 화면의 샘플 대화와 입력 메시지는 현재 브라우저 메모리에만 표시됩니다. 소켓 서버는 Firebase 토큰과 채널·DM 권한을 검사하며 실시간 전송·저장은 후속 일차 작업입니다. 초대 메일의 실제 발송과 Functions 배포는 SMTP·Blaze 설정 전입니다.
+> **현재 상태: 12일차 소켓 메시지 저장 완료.** 워크스페이스 생성은 실제 Firebase 프로젝트에서 사용할 수 있고 초대는 로컬 구현입니다. 채팅 화면의 샘플 대화와 입력 메시지는 현재 브라우저 메모리에만 표시됩니다. 소켓 서버는 Firebase 토큰·룸 권한을 검사하고 메시지를 Firestore에 저장·전파하지만, 웹 채팅 UI는 아직 서버에 연결하지 않았습니다. 초대 메일의 실제 발송과 Functions 배포는 SMTP·Blaze 설정 전입니다.
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand + FullCalendar (예정)
@@ -26,7 +26,7 @@ Node.js 22.13+와 Java 21이 필요합니다. 이메일 가입 후 에뮬레이�
 
 채팅 메뉴에서 채널·DM 샘플 대화와 메시지 입력 UI를 확인할 수 있습니다. Enter로 전송하고 Shift+Enter로 줄을 바꿉니다. 입력한 메시지와 초안은 현재 탭에서만 유지되며 로그아웃하면 지워집니다. `npm run test:chat`으로 입력·상태·재시도·대화 간 분리를 확인할 수 있습니다.
 
-Auth·Firestore 에뮬레이터를 실행한 뒤 `npm run dev:socket:emulator`로 소켓 서버를 별도 실행합니다. `http://127.0.0.1:3001/healthz`에서 상태를 확인하고 `npm run test:socket`으로 토큰과 룸 권한을 검증할 수 있습니다. 현재 웹 채팅 UI는 소켓 서버에 연결하지 않으며, 메시지 저장·전파도 아직 구현 전입니다. 설정과 이벤트 설명은 [소켓 서버 문서](apps/socket-server/README.md)를 참고하세요.
+Auth·Firestore 에뮬레이터를 실행한 뒤 `npm run dev:socket:emulator`로 소켓 서버를 별도 실행합니다. `http://127.0.0.1:3001/healthz`에서 상태를 확인하고 `npm run test:socket`으로 토큰·룸 권한·메시지 저장·중복 방지를 검증할 수 있습니다. 현재 웹 채팅 UI는 소켓 서버에 연결하지 않습니다. 설정과 이벤트 설명은 [소켓 서버 문서](apps/socket-server/README.md)를 참고하세요.
 
 ## Firebase 개발 환경
 
@@ -62,7 +62,7 @@ npx firebase deploy --only auth --config firebase.auth.local.json --project task
 | `apps/web/src/services/`, `store/` | Firebase 연결과 클라이언트 상태 관리 |
 | `apps/web/src/types/`, `config/` | 웹 앱 공통 타입과 환경 설정 |
 | `shared/contracts/` | 웹·소켓 서버 간 이벤트 계약 |
-| `apps/socket-server/` | 채팅 서버의 연결·헬스체크·Firebase 인증·룸 권한 검사 |
+| `apps/socket-server/` | 채팅 서버의 연결·인증·룸 권한 검사·메시지 저장과 전파 |
 | `functions/` | 워크스페이스·초대 서버 함수와 SMTP 배포 설정 안내 |
 
 ## 환경 변수

@@ -1,6 +1,6 @@
 # 데이터 모델 초안
 
-> 8일차에 워크스페이스·초대·멤버십 경로와 읽기 권한을 구현했다. 채팅·업무 필드는 후속 일차에서 확정한다. 확인된 사용자의 최초 워크스페이스 생성 3문서 일괄 쓰기만 클라이언트에서 허용하고 나머지 쓰기는 차단한다.
+> 8일차에 워크스페이스·초대·멤버십 경로와 읽기 권한을 구현했고, 12일차에 서버 전용 메시지 저장 필드를 구현했다. 업무 필드는 후속 일차에서 확정한다. 확인된 사용자의 최초 워크스페이스 생성 3문서 일괄 쓰기만 클라이언트에서 허용하고 나머지 쓰기는 차단한다.
 
 - `workspaces/{workspaceId}`: name, ownerId, createdAt. 클라이언트가 생성할 때 장 멤버십과 본인 목록 미러를 같은 일괄 쓰기로 생성해야 한다.
 - `workspaces/{workspaceId}/members/{uid}`: uid, email, role(owner/member), joinedAt. 문서 ID를 Firebase UID로 고정한다.
@@ -8,7 +8,7 @@
 - `workspaceInvites/{inviteId}`: workspaceId, invitedEmail, invitedBy, tokenHash, status(pending/accepted/revoked), createdAt, emailSentAt, expiresAt, acceptedBy, acceptedAt, revokedAt. 원본 토큰은 저장하지 않고 초대 문서는 클라이언트가 직접 읽지 못한다.
 - `channels/{channelId}`: workspaceId, name. 8일차 규칙은 워크스페이스 전체 공개 채널만 지원한다.
 - `dmRooms/{roomId}`: workspaceId, participantIds
-- `messages/{messageId}`: workspaceId, sourceType(channel/dm), channelId 또는 dmRoomId, senderId, clientMessageId, content, createdAt
+- `messages/{messageId}`: workspaceId, sourceType(channel/dm), channelId 또는 dmRoomId, senderId, clientMessageId, content, createdAt. 서버가 사용자 UID와 `clientMessageId`로 결정한 ID에 트랜잭션으로 한 번만 생성한다. `createdAt`은 소켓 서버가 생성한 Firestore Timestamp다. 같은 사용자의 클라이언트 ID는 룸과 워크스페이스를 통틀어 고유해야 한다.
 - `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType, title, requesterId, assigneeId, dueDate, proposedDueDate, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewDeadlineAt, completionReason
 - `taskEvents/{eventId}`: taskId, actorId, action, createdAt, metadata
 - `notifications/{id}`: recipientId, taskId, reviewCycle, type, scheduledAt, sentAt

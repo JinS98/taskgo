@@ -1,6 +1,6 @@
 # Socket.io 서버
 
-11일차에는 Firebase ID 토큰 인증과 워크스페이스·채널·DM 권한 검사를 연결했습니다. 로컬에서는 두 터미널에서 실행합니다.
+12일차에는 Firebase ID 토큰 인증, 채널·DM 권한 검사, Firestore 메시지 저장과 소켓 전파를 연결했습니다. 로컬에서는 두 터미널에서 실행합니다.
 
 ```bash
 npm install
@@ -15,4 +15,8 @@ curl.exe http://127.0.0.1:3001/healthz
 
 클라이언트는 Socket.IO 연결 옵션의 `auth.token`에 로그인 사용자의 Firebase ID 토큰을 넣습니다. 서버는 연결 시 서명·만료·철회·비활성 여부와 이메일 확인 상태를 검사합니다. 토큰 만료 시 연결을 종료하므로 재연결할 때 갱신된 토큰을 전달해야 합니다. 로컬의 `.env.emulator`는 `demo-taskgo`와 Auth·Firestore 에뮬레이터 주소를 지정합니다. 에뮬레이터 호스트 환경 변수는 실제 서비스 환경에 넣지 않습니다.
 
-`GET /healthz`는 `{ "status": "ok", "protocolVersion": 1 }`을 반환합니다. 웹과 서버의 이벤트 타입은 `shared/contracts/src/socket.ts`에 정의했습니다. 연결되면 `server:ready`를 보냅니다. `room:join`은 워크스페이스 멤버십과 채널 소속 또는 DM 참여자를 확인한 후 성공 ACK를 반환합니다. 룸 참가·메시지·타이핑 요청은 현재 권한을 검사하며, 잘못된 요청은 `INVALID_REQUEST`, 권한이 없으면 `FORBIDDEN`으로 응답합니다. 현재 `message:send`와 `typing:set`은 권한 검사 후 `FEATURE_NOT_READY`로 응답하고 저장·방송하지 않습니다. 저장과 성공 ACK는 12일차에 연결합니다. 멤버십이나 DM 참여자가 변경되면 이후 요청은 거절되며, 향후 방송 구현 시 수신자 권한 재확인이 필요합니다.
+`GET /healthz`는 `{ "status": "ok", "protocolVersion": 1 }`을 반환합니다. 웹과 서버의 이벤트 타입은 `shared/contracts/src/socket.ts`에 정의했습니다. 연결되면 `server:ready`를 보냅니다. `room:join`은 워크스페이스 멤버십과 채널 소속 또는 DM 참여자를 확인한 후 성공 ACK를 반환합니다. 잘못된 요청은 `INVALID_REQUEST`, 권한이 없으면 `FORBIDDEN`으로 응답합니다.
+
+`message:send`는 룸 참가와 현재 권한을 확인한 뒤 Firestore 트랜잭션에서 멤버십·룸 소속·`clientMessageId`를 다시 검사합니다. 메시지 ID는 사용자 UID와 `clientMessageId`에서 결정하며, 한 사용자는 모든 룸에서 고유한 `clientMessageId`를 써야 합니다. 동일 요청의 재전송은 기존 `messageId`로 성공 ACK를 반환하고 다시 방송하지 않습니다. 이미 사용한 ID를 다른 내용이나 룸에 쓰면 `CONFLICT`를 반환합니다. 저장이 성공한 후 ACK를 보내고 `message:created`를 전달합니다. 수신 직전 각 소켓의 멤버십·DM 참여 상태를 확인하며, 권한이 사라진 소켓은 룸에서 제거합니다. 저장 실패에는 `INTERNAL_ERROR`를 반환합니다. 성공 ACK는 저장 완료를 뜻하며 모든 수신자에게 방송됐다는 보장은 아닙니다. 누락된 방송은 후속 작업의 재조회로 복구합니다.
+
+메시지는 `messages/{messageId}`에 워크스페이스·원본 채널 또는 DM·검증된 발신자·클라이언트 ID·내용·서버 시각으로 저장됩니다. 클라이언트 직접 쓰기는 Firestore 규칙에서 차단합니다. `typing:set`은 아직 `FEATURE_NOT_READY`로 거절합니다. 현재 방송은 단일 소켓 서버 인스턴스에서 동작하며, 다중 인스턴스에는 어댑터와 수신자 권한 검증 설계가 추가로 필요합니다. 브라우저 채팅 UI의 실제 연결과 재연결 후 누락 메시지 조회도 후속 작업입니다.

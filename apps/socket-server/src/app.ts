@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Server } from 'socket.io';
-import type { ClientToServerEvents, RoomTarget, ServerToClientEvents, SocketAck, SocketErrorCode, SocketProtocolVersion } from '@taskgo/contracts';
+import type { ClientToServerEvents, CreatedMessage, RoomTarget, SendMessageRequest, ServerToClientEvents, SocketAck, SocketErrorCode, SocketProtocolVersion } from '@taskgo/contracts';
 
 const protocolVersion: SocketProtocolVersion = 1;
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
@@ -14,7 +14,14 @@ export interface SocketIdentity {
 export interface SocketServices {
   verifyIdentity(token: string): Promise<SocketIdentity | null>;
   canAccessRoom(uid: string, target: RoomTarget): Promise<boolean>;
+  saveMessage(uid: string, message: SendMessageRequest): Promise<SaveMessageResult>;
 }
+
+export type SaveMessageResult =
+  | { status: 'created'; message: CreatedMessage }
+  | { status: 'duplicate'; message: CreatedMessage }
+  | { status: 'forbidden' }
+  | { status: 'conflict' };
 
 export interface SocketAppOptions {
   allowedOrigins: readonly string[];
@@ -58,6 +65,31 @@ export function createSocketApp({ allowedOrigins, services }: SocketAppOptions) 
     cors: { origin: [...origins], methods: ['GET', 'POST'] },
     allowRequest: (request, callback) => callback(null, typeof request.headers.origin === 'string' && origins.has(request.headers.origin)),
   });
+
+  async function deliverToAuthorizedRoom(message: CreatedMessage): Promise<void> {
+    const target: RoomTarget = message;
+    const name = roomName(target);
+    const socketIds = [...(io.sockets.adapter.rooms.get(name) ?? [])];
+    await Promise.all(socketIds.map(async (socketId) => {
+      const recipient = io.sockets.sockets.get(socketId);
+      if (!recipient?.connected || !recipient.rooms.has(name)) return;
+      if (recipient.data.identity.expiresAt <= Date.now()) {
+        recipient.disconnect(true);
+        return;
+      }
+      try {
+        if (!await services.canAccessRoom(recipient.data.identity.uid, target)) {
+          await recipient.leave(name);
+          return;
+        }
+        if (recipient.connected && recipient.rooms.has(name) && recipient.data.identity.expiresAt > Date.now()) {
+          recipient.emit('message:created', message);
+        }
+      } catch {
+        // A failed permission lookup must never become permission to receive.
+      }
+    }));
+  }
 
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
@@ -150,7 +182,23 @@ export function createSocketApp({ allowedOrigins, services }: SocketAppOptions) 
           if (typeof ack === 'function') ack(failure('INVALID_REQUEST', '메시지 내용을 확인해 주세요.'));
           return;
         }
-        if (typeof ack === 'function') ack(failure('FEATURE_NOT_READY', '메시지 저장은 다음 작업에서 연결합니다.'));
+        const request: SendMessageRequest = { ...target, clientMessageId: message.clientMessageId, content: message.content };
+        const result = await services.saveMessage(identity.uid, request);
+        if (result.status === 'forbidden') {
+          try { await socket.leave(roomName(target)); } catch { socket.disconnect(true); }
+          if (typeof ack === 'function') ack(failure('FORBIDDEN', '이 룸에 접근할 수 없습니다.'));
+          return;
+        }
+        if (result.status === 'conflict') {
+          if (typeof ack === 'function') ack(failure('CONFLICT', '이미 다른 내용으로 사용한 메시지 ID입니다.'));
+          return;
+        }
+        if (typeof ack === 'function') ack({ ok: true, data: { messageId: result.message.messageId } });
+        if (result.status === 'created') {
+          void deliverToAuthorizedRoom(result.message).catch((error: unknown) => {
+            console.error('Saved message delivery failed', error);
+          });
+        }
       });
     });
 
