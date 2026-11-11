@@ -27,7 +27,7 @@ Cloud Functions (워크스페이스·초대) + Scheduler (검수/알림/AI 예�
 - `apps/web/src/types/domain.ts`: 화면·상태 관리에 필요한 공통 ID·역할·뷰 이름을 정의한다. 워크스페이스·초대 스키마와 읽기 규칙은 8일차에 구현했고 채팅·업무 필드는 후속 일차에 확정한다.
 - `apps/web/src/config/env.ts`: Vite 클라이언트 설정을 읽는다. Firebase 설정이 없으면 인증 화면 대신 누락된 변수 안내를 표시한다.
 - `apps/web/src/services/firebase.ts`는 Firebase Auth·Firestore·Functions를 초기화하고 명시적 설정에서만 에뮬레이터에 연결한다. `functions/src/index.ts`는 서버 권한을 검증한다. 소켓 어댑터는 이후 추가한다. `store/`는 클라이언트 상태를 담당한다.
-- `shared/contracts/`는 웹과 소켓 서버 사이의 이벤트 타입 계약이다. `apps/socket-server/`는 10일차에 HTTP 헬스체크와 소켓 연결을 구현했다. 브라우저 타입이나 Origin 제한만으로 접근 권한을 보장하지 않으며, 11일차부터 서버가 토큰·멤버십을 검증한다.
+- `shared/contracts/`는 웹과 소켓 서버 사이의 이벤트 타입 계약이다. `apps/socket-server/`는 HTTP 헬스체크, 소켓 연결, Firebase Admin 토큰 검증과 워크스페이스·채널·DM 접근 검사를 수행한다. Origin 제한은 인증을 대신하지 않는다. 토큰 만료 시 연결을 종료하고 룸 참가·메시지·타이핑 요청마다 현재 멤버십을 확인한다. 메시지 저장·방송은 12일차 범위다.
 - Vite 프로젝트 루트가 `apps/web`이므로 웹 환경 파일은 `apps/web/.env.local`에 둔다. `VITE_` 값은 클라이언트에 공개되며 서버 비밀키는 여기에 두지 않는다.
 
 ## 배포 후보

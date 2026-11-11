@@ -4,7 +4,7 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 10일차 소켓 서버 기반 완료.** 워크스페이스 생성은 실제 Firebase 프로젝트에서 사용할 수 있고 초대는 로컬 구현입니다. 채팅 화면의 샘플 대화와 입력 메시지는 현재 브라우저 메모리에만 표시됩니다. 소켓 서버는 로컬 연결·헬스체크까지 구현했고 인증·실시간 전송·저장은 후속 일차 작업입니다. 초대 메일의 실제 발송과 Functions 배포는 SMTP·Blaze 설정 전입니다.
+> **현재 상태: 11일차 소켓 인증·룸 권한 검사 완료.** 워크스페이스 생성은 실제 Firebase 프로젝트에서 사용할 수 있고 초대는 로컬 구현입니다. 채팅 화면의 샘플 대화와 입력 메시지는 현재 브라우저 메모리에만 표시됩니다. 소켓 서버는 Firebase 토큰과 채널·DM 권한을 검사하며 실시간 전송·저장은 후속 일차 작업입니다. 초대 메일의 실제 발송과 Functions 배포는 SMTP·Blaze 설정 전입니다.
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand + FullCalendar (예정)
@@ -26,7 +26,7 @@ Node.js 22.13+와 Java 21이 필요합니다. 이메일 가입 후 에뮬레이�
 
 채팅 메뉴에서 채널·DM 샘플 대화와 메시지 입력 UI를 확인할 수 있습니다. Enter로 전송하고 Shift+Enter로 줄을 바꿉니다. 입력한 메시지와 초안은 현재 탭에서만 유지되며 로그아웃하면 지워집니다. `npm run test:chat`으로 입력·상태·재시도·대화 간 분리를 확인할 수 있습니다.
 
-소켓 서버는 `npm run dev:socket`으로 별도 실행합니다. `http://127.0.0.1:3001/healthz`에서 상태를 확인하고 `npm run test:socket`으로 로컬 연결과 이벤트 계약을 검증할 수 있습니다. 현재 웹 채팅 UI는 소켓 서버에 연결하지 않으며, 서버는 인증·권한 기능이 추가되기 전까지 모든 룸·메시지 요청을 거절합니다. 설정과 이벤트 설명은 [소켓 서버 문서](apps/socket-server/README.md)를 참고하세요.
+Auth·Firestore 에뮬레이터를 실행한 뒤 `npm run dev:socket:emulator`로 소켓 서버를 별도 실행합니다. `http://127.0.0.1:3001/healthz`에서 상태를 확인하고 `npm run test:socket`으로 토큰과 룸 권한을 검증할 수 있습니다. 현재 웹 채팅 UI는 소켓 서버에 연결하지 않으며, 메시지 저장·전파도 아직 구현 전입니다. 설정과 이벤트 설명은 [소켓 서버 문서](apps/socket-server/README.md)를 참고하세요.
 
 ## Firebase 개발 환경
 
@@ -62,14 +62,14 @@ npx firebase deploy --only auth --config firebase.auth.local.json --project task
 | `apps/web/src/services/`, `store/` | Firebase 연결과 클라이언트 상태 관리 |
 | `apps/web/src/types/`, `config/` | 웹 앱 공통 타입과 환경 설정 |
 | `shared/contracts/` | 웹·소켓 서버 간 이벤트 계약 |
-| `apps/socket-server/` | 채팅 서버의 로컬 연결·헬스체크, 후속 일차에 인증·저장 연결 |
+| `apps/socket-server/` | 채팅 서버의 연결·헬스체크·Firebase 인증·룸 권한 검사 |
 | `functions/` | 워크스페이스·초대 서버 함수와 SMTP 배포 설정 안내 |
 
 ## 환경 변수
 
 웹 앱의 예시는 `apps/web/.env.example`에 있습니다. 실제 프로젝트를 사용할 때 웹 설정을 `apps/web/.env.local`에 입력합니다. `.env.local`은 Git에서 제외됩니다.
 
-`VITE_` 변수는 브라우저 번들에 공개되므로 서버 비밀키를 넣지 않습니다. 웹 설정의 소켓 주소 기본값은 `http://localhost:3001`이며, 웹 채팅 UI 연결은 후속 일차에 추가합니다.
+`VITE_` 변수는 브라우저 번들에 공개되므로 서버 비밀키를 넣지 않습니다. 웹 설정의 소켓 주소 기본값은 `http://localhost:3001`이며, 웹 채팅 UI 연결은 후속 일차에 추가합니다. 소켓 서버는 `FIREBASE_PROJECT_ID`와 Firebase Admin 자격 증명을 서버 환경에서 읽습니다.
 
 초기 설정 검증:
 

@@ -1,7 +1,7 @@
 export type SocketProtocolVersion = 1;
 
 export type RoomKind = 'channel' | 'dm';
-export type SocketErrorCode = 'AUTH_NOT_READY' | 'INVALID_REQUEST' | 'FORBIDDEN' | 'INTERNAL_ERROR';
+export type SocketErrorCode = 'INVALID_REQUEST' | 'FORBIDDEN' | 'AUTH_EXPIRED' | 'FEATURE_NOT_READY' | 'INTERNAL_ERROR';
 
 export interface RoomTarget {
   workspaceId: string;
