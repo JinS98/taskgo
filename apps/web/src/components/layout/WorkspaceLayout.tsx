@@ -11,6 +11,8 @@ import styles from './WorkspaceLayout.module.scss';
 interface WorkspaceLayoutProps {
   children: ReactNode;
   accountControls?: ReactNode;
+  workspaceName?: string;
+  canManageWorkspace?: boolean;
 }
 
 const viewTabs: { id: AppView; label: string }[] = [
@@ -19,12 +21,12 @@ const viewTabs: { id: AppView; label: string }[] = [
   { id: 'calendar', label: '캘린더' },
 ];
 
-export function WorkspaceLayout({ children, accountControls }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ children, accountControls, workspaceName, canManageWorkspace = false }: WorkspaceLayoutProps) {
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
   const setView = useWorkspaceNavigationStore((state) => state.setView);
   const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
-  const currentTitle = activeView === 'chat'
+  const currentTitle = activeView === 'workspace' ? '워크스페이스 관리' : activeView === 'chat'
     ? `${selectedConversation.kind === 'channel' ? '# ' : ''}${getConversationName(selectedConversation)}`
     : viewTabs.find(({ id }) => id === activeView)?.label;
 
@@ -42,7 +44,7 @@ export function WorkspaceLayout({ children, accountControls }: WorkspaceLayoutPr
             </span>
             <span className={styles.brandName}>TASKGO</span>
           </div>
-          <span className={styles.mobileStatus}>샘플 워크스페이스</span>
+          <span className={styles.mobileStatus}>{workspaceName ?? '샘플 워크스페이스'}</span>
         </div>
 
         <div className={styles.workspaceSection}>
@@ -50,8 +52,8 @@ export function WorkspaceLayout({ children, accountControls }: WorkspaceLayoutPr
           <div className={styles.workspaceCard}>
             <span className={styles.workspaceIcon} aria-hidden="true">T</span>
             <div>
-              <strong>Taskgo 데모 팀</strong>
-              <span>샘플 데이터</span>
+              <strong>{workspaceName ?? 'Taskgo 데모 팀'}</strong>
+              <span>{canManageWorkspace ? '워크스페이스 장' : workspaceName ? '멤버' : '샘플 데이터'}</span>
             </div>
           </div>
         </div>
@@ -70,6 +72,7 @@ export function WorkspaceLayout({ children, accountControls }: WorkspaceLayoutPr
                 {label}
               </button>
             ))}
+            {canManageWorkspace && <button className={`${styles.navButton} ${activeView === 'workspace' ? styles.active : ''}`} type="button" aria-pressed={activeView === 'workspace'} onClick={() => setView('workspace')}>워크스페이스 관리</button>}
           </div>
         </nav>
 
@@ -120,7 +123,7 @@ export function WorkspaceLayout({ children, accountControls }: WorkspaceLayoutPr
         <header className={styles.topbar}>
           <span>{currentTitle}</span>
           <div className={styles.topbarActions}>
-            <span className={styles.previewBadge}>샘플 화면</span>
+            {activeView !== 'workspace' && <span className={styles.previewBadge}>샘플 화면</span>}
             {accountControls}
           </div>
         </header>

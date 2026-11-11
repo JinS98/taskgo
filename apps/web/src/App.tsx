@@ -11,7 +11,7 @@ const upcomingAreas = [
   { id: 'calendar', title: '팀 캘린더', description: '업무 마감과 회의 일정을 함께 살펴봅니다.' },
 ] satisfies { id: AppView; title: string; description: string }[];
 
-const viewCopy: Record<Exclude<AppView, 'chat'>, { eyebrow: string; title: string; description: string }> = {
+const viewCopy: Record<Exclude<AppView, 'chat' | 'workspace'>, { eyebrow: string; title: string; description: string }> = {
   board: {
     eyebrow: 'TASK BOARD',
     title: '업무 보드',
@@ -24,21 +24,24 @@ const viewCopy: Record<Exclude<AppView, 'chat'>, { eyebrow: string; title: strin
   },
 };
 
-export default function App({ accountControls }: { accountControls?: ReactNode }) {
+export default function App({ accountControls, workspaceName, canManageWorkspace = false, workspaceManagement }: { accountControls?: ReactNode; workspaceName?: string; canManageWorkspace?: boolean; workspaceManagement?: ReactNode }) {
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
 
+  const showManagement = activeView === 'workspace' && canManageWorkspace;
+  const previewView = activeView === 'workspace' ? 'chat' : activeView;
   const selectedName = getConversationName(selectedConversation);
-  const currentView = activeView === 'chat'
+  const currentView = previewView === 'chat'
     ? {
       eyebrow: selectedConversation.kind === 'channel' ? 'CHANNEL PREVIEW' : 'DIRECT MESSAGE PREVIEW',
       title: `${selectedConversation.kind === 'channel' ? '# ' : ''}${selectedName}`,
       description: `${selectedName} ${selectedConversation.kind === 'channel' ? '채널' : 'DM'}의 대화가 이곳에 표시됩니다. 현재는 샘플 목록을 탐색할 수 있습니다.`,
     }
-    : viewCopy[activeView];
+    : viewCopy[previewView];
 
   return (
-    <WorkspaceLayout accountControls={accountControls}>
+    <WorkspaceLayout accountControls={accountControls} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace}>
+      {showManagement ? workspaceManagement : <>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>
         <h1 id="hero-title" aria-live="polite">{currentView.title}</h1>
@@ -75,6 +78,7 @@ export default function App({ accountControls }: { accountControls?: ReactNode }
           ))}
         </div>
       </section>
+      </>}
     </WorkspaceLayout>
   );
 }

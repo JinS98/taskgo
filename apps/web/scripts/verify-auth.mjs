@@ -48,6 +48,11 @@ try {
   await user.click(screen.getByRole('button', { name: '만들기' }));
   await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
   await screen.findByText(/워크스페이스를 만들었습니다\. 멤버 초대는/);
+  await user.click(screen.getByRole('button', { name: '워크스페이스 관리' }));
+  await screen.findByRole('heading', { name: '워크스페이스 멤버' });
+  await screen.findByText('member@example.test');
+  assert.ok(screen.getByRole('heading', { name: '초대 현황' }));
+  assert.ok(screen.getByLabelText('이메일 주소'));
 
   await user.click(screen.getByRole('button', { name: '계정' }));
   assert.match(screen.getByLabelText('계정 설정').textContent, /이메일·비밀번호/);
@@ -83,6 +88,8 @@ try {
   await user.click(screen.getByRole('button', { name: '만들기' }));
   await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
   await screen.findByText(/워크스페이스를 만들었습니다\. 멤버 초대는/);
+  await user.click(screen.getByRole('button', { name: '워크스페이스 관리' }));
+  await screen.findByText('google-member@example.test');
   const googleUid = services.auth.currentUser.uid;
 
   await user.click(screen.getByRole('button', { name: '계정' }));

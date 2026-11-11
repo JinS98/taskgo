@@ -29,6 +29,7 @@ try {
   const { useWorkspaceNavigationStore } = await server.ssrLoadModule('/src/store/useWorkspaceNavigationStore.ts');
   const user = userEvent.setup();
   const app = render(React.createElement(App));
+  assert.equal(screen.queryByRole('button', { name: '워크스페이스 관리' }), null);
 
   const title = () => screen.getByRole('heading', { level: 1 }).textContent;
   assert.equal(title(), '# 전체');
@@ -59,6 +60,16 @@ try {
   app.unmount();
   render(React.createElement(App));
   assert.equal(title(), '# 프로젝트');
+
+  cleanup();
+  render(React.createElement(App, { workspaceName: '내 팀', canManageWorkspace: true, workspaceManagement: React.createElement('h1', null, '멤버와 초대 관리') }));
+  await user.click(screen.getByRole('button', { name: '워크스페이스 관리' }));
+  assert.equal(title(), '멤버와 초대 관리');
+  assert.ok(screen.getAllByText('내 팀').length >= 1);
+  cleanup();
+  useWorkspaceNavigationStore.getState().setView('chat');
+  render(React.createElement(App, { workspaceName: '참여 팀', canManageWorkspace: false }));
+  assert.equal(screen.queryByRole('button', { name: '워크스페이스 관리' }), null);
 
   console.log('Shared navigation store, view switching, and conversation selection passed.');
 } finally {

@@ -7,4 +7,4 @@ export type MessageId = string;
 export type TaskId = string;
 
 export type WorkspaceRole = 'owner' | 'member';
-export type AppView = 'chat' | 'board' | 'calendar';
+export type AppView = 'chat' | 'board' | 'calendar' | 'workspace';
