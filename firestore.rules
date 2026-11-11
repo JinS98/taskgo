@@ -1,6 +1,74 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(workspaceId) {
+      return signedIn() && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+    }
+
+    function isDmParticipant(workspaceId, roomId) {
+      let room = get(/databases/$(database)/documents/dmRooms/$(roomId)).data;
+      return room.workspaceId == workspaceId && isMember(workspaceId) && request.auth.uid in room.participantIds;
+    }
+
+    match /users/{userId}/workspaces/{workspaceId} {
+      allow get, list: if signedIn() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /workspaces/{workspaceId} {
+      allow get, list: if isMember(workspaceId);
+      allow write: if false;
+
+      match /members/{memberId} {
+        allow get, list: if isMember(workspaceId);
+        allow write: if false;
+      }
+    }
+
+    match /workspaceInvites/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /channels/{channelId} {
+      allow get, list: if isMember(resource.data.workspaceId);
+      allow write: if false;
+    }
+
+    match /dmRooms/{roomId} {
+      allow get, list: if isMember(resource.data.workspaceId) && request.auth.uid in resource.data.participantIds;
+      allow write: if false;
+    }
+
+    match /messages/{messageId} {
+      allow get, list: if resource.data.sourceType == 'channel' && isMember(resource.data.workspaceId)
+        || resource.data.sourceType == 'dm' && isDmParticipant(resource.data.workspaceId, resource.data.dmRoomId);
+      allow write: if false;
+    }
+
+    match /tasks/{taskId} {
+      allow get, list: if isMember(resource.data.workspaceId);
+      allow write: if false;
+    }
+
+    match /taskEvents/{eventId} {
+      allow get, list: if isMember(get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.workspaceId);
+      allow write: if false;
+    }
+
+    match /meetings/{meetingId} {
+      allow get, list: if isMember(resource.data.workspaceId);
+      allow write: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow get, list: if signedIn() && resource.data.recipientId == request.auth.uid;
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

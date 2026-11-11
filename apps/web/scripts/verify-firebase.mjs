@@ -26,7 +26,7 @@ try {
     (error) => error.code === 'permission-denied',
   );
 
-  console.log('Firebase Auth emulator connection and deny-all Firestore rules passed.');
+  console.log('Firebase Auth emulator connection and unmatched Firestore path denial passed.');
 } finally {
   if (services) {
     await signOut(services.auth);

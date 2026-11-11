@@ -1,0 +1,53 @@
+.page, .loading {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--page);
+  color: #fff;
+}
+
+.card {
+  width: min(100%, 480px);
+  padding: 36px;
+  border: 1px solid #4b4b70;
+  border-radius: 20px;
+  background: #292d46;
+
+  h1 { margin: 12px 0; font-size: 30px; }
+  p { line-height: 1.6; }
+}
+
+.eyebrow { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .16em; }
+.form { display: grid; gap: 9px; margin: 20px 0; }
+.form label, .panel label { font-size: 12px; font-weight: 700; }
+.form input, .panel select {
+  width: 100%; min-height: 40px; padding: 8px 10px;
+  border: 1px solid #666482; border-radius: 8px;
+  background: #20243a; color: #fff; font: inherit;
+}
+.form button, .card > button:not(.textButton), .workspaceButton {
+  min-height: 40px; padding: 8px 14px; border: 0; border-radius: 8px;
+  background: var(--accent); color: #1e2035; cursor: pointer; font: inherit; font-weight: 700;
+}
+.form button:disabled, .card button:disabled { opacity: .6; cursor: wait; }
+.error { padding: 10px; border-radius: 8px; background: #6b303d; color: #fff1f2; }
+.textButton { margin-top: 12px; border: 0; background: transparent; color: var(--soft-text); cursor: pointer; font: inherit; }
+.shell { position: relative; height: 100%; }
+.workspaceButton { min-height: 36px; background: #363652; color: #fff; border: 1px solid #646081; }
+.panel {
+  position: absolute; top: 58px; right: 16px; z-index: 30;
+  width: min(380px, calc(100vw - 32px)); max-height: calc(100dvh - 72px); overflow-y: auto;
+  padding: 22px; border: 1px solid #5d5b7c; border-radius: 16px;
+  background: #292d46; box-shadow: 0 20px 50px #10122488; color: #fff;
+
+  h2 { margin-top: 0; }
+  h3 { margin-top: 28px; }
+  select { margin-top: 7px; }
+}
+.invites { padding: 0; list-style: none; }
+.invites li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #4b4b70; overflow-wrap: anywhere; }
+.invites small { display: block; margin-top: 3px; color: var(--muted); }
+.invites button { border: 0; background: transparent; color: #ffb4b4; cursor: pointer; }
+.localLink { overflow-wrap: anywhere; }
+.localLink a { color: var(--accent); }

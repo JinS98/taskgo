@@ -43,7 +43,10 @@ try {
   assert.ok(verification?.oobCode);
   await applyActionCode(services.auth, verification.oobCode);
   await user.click(screen.getByRole('button', { name: '인증 확인' }));
-  await screen.findByRole('heading', { name: '# 전체' });
+  await screen.findByRole('heading', { name: '워크스페이스 만들기' }, { timeout: 10000 });
+  await user.type(screen.getByLabelText('워크스페이스 이름'), 'Email Team');
+  await user.click(screen.getByRole('button', { name: '만들기' }));
+  await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
 
   await user.click(screen.getByRole('button', { name: '계정' }));
   assert.match(screen.getByLabelText('계정 설정').textContent, /이메일·비밀번호/);
@@ -63,7 +66,7 @@ try {
   await user.clear(screen.getByLabelText('비밀번호'));
   await user.type(screen.getByLabelText('비밀번호'), 'StrongPass123!');
   await user.click(screen.getByRole('button', { name: '이메일로 로그인' }));
-  await screen.findByRole('heading', { name: '# 전체' });
+  await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
   assert.equal(services.auth.currentUser.uid, passwordUid);
 
   await act(async () => { await signOut(services.auth); });
@@ -74,7 +77,10 @@ try {
     email_verified: true,
   }));
   await act(async () => { await signInWithCredential(services.auth, googleCredential); });
-  await screen.findByRole('heading', { name: '# 전체' });
+  await screen.findByRole('heading', { name: '워크스페이스 만들기' }, { timeout: 10000 });
+  await user.type(screen.getByLabelText('워크스페이스 이름'), 'Google Team');
+  await user.click(screen.getByRole('button', { name: '만들기' }));
+  await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
   const googleUid = services.auth.currentUser.uid;
 
   await user.click(screen.getByRole('button', { name: '계정' }));
@@ -87,7 +93,7 @@ try {
   await user.type(screen.getByRole('textbox', { name: '이메일' }), 'google-member@example.test');
   await user.type(screen.getByLabelText('비밀번호'), 'OtherPass123!');
   await user.click(screen.getByRole('button', { name: '이메일로 로그인' }));
-  await screen.findByRole('heading', { name: '# 전체' });
+  await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
   assert.equal(services.auth.currentUser.uid, googleUid);
 
   console.log('Protected routes, email verification, password login, Google session, and account linking passed.');

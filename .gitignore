@@ -1,9 +1,11 @@
 node_modules/
 dist/
+functions/lib/
 *.tsbuildinfo
 .env
 .env.local
 .env.*.local
+.secret.local
 .firebase/
 firebase-debug.log
 firestore-debug.log

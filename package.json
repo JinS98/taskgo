@@ -3,20 +3,28 @@
   "private": true,
   "version": "0.0.1",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "functions"
   ],
   "scripts": {
     "dev:web": "npm run dev -w @taskgo/web",
     "dev:web:emulator": "npm run dev:emulator -w @taskgo/web",
     "build:web": "npm run build -w @taskgo/web",
-    "typecheck": "npm run typecheck -w @taskgo/web",
+    "build:functions": "npm run build -w @taskgo/functions",
+    "prepare:emulator": "node functions/scripts/prepare-emulator.mjs",
+    "typecheck": "npm run typecheck -w @taskgo/web && npm run typecheck -w @taskgo/functions",
     "lint": "npm run lint -w @taskgo/web",
     "test:ui": "npm run test:ui -w @taskgo/web",
-    "emulators": "firebase emulators:start --only auth,firestore --project demo-taskgo",
+    "emulators": "npm run build:functions && npm run prepare:emulator && firebase emulators:start --only auth,firestore,functions --project demo-taskgo",
     "test:firebase": "firebase emulators:exec --only auth,firestore --project demo-taskgo \"npm run verify:firebase -w @taskgo/web\"",
-    "test:auth": "firebase emulators:exec --only auth,firestore --project demo-taskgo \"npm run verify:auth -w @taskgo/web\""
+    "test:auth": "npm run build:functions && npm run prepare:emulator && firebase emulators:exec --only auth,firestore,functions --project demo-taskgo \"npm run verify:auth -w @taskgo/web\"",
+    "test:workspace": "npm run build:functions && npm run prepare:emulator && firebase emulators:exec --only auth,firestore,functions --project demo-taskgo \"npm run verify:workspace -w @taskgo/web\""
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "firebase-tools": "^15.35.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.7"
   }
 }
