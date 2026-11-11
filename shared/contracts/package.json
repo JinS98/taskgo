@@ -1,0 +1,12 @@
+{
+  "name": "@taskgo/contracts",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "types": "./src/socket.ts",
+  "exports": {
+    ".": {
+      "types": "./src/socket.ts"
+    }
+  }
+}
