@@ -13,8 +13,8 @@ interface Membership { workspaceId: string; name: string; role: 'owner' | 'membe
 interface Invite { inviteId: string; email: string; status: string; expiresAt: string }
 interface Member { uid: string; email: string; role: 'owner' | 'member' }
 
-function PickerMark({ selected = false }: { selected?: boolean }) {
-  return <svg className={styles.pickerMark} aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={selected ? 'M4.5 10l3.5 3.5 7.5-7.5' : 'm5 7.5 5 5 5-5'} /></svg>;
+function PickerMark() {
+  return <svg className={styles.pickerMark} aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 7.5 5 5 5-5" /></svg>;
 }
 
 export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: Auth; user: User; db: Firestore; functions: Functions; onRefresh: () => Promise<void> }) {
@@ -191,7 +191,6 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
             {workspaces.map((item) => <button type="button" key={item.workspaceId} className={item.workspaceId === selected.workspaceId ? styles.selectedOption : ''} aria-current={item.workspaceId === selected.workspaceId ? 'true' : undefined} onClick={() => switchWorkspace(item.workspaceId)}>
               <span className={styles.pickerIcon} aria-hidden="true">{item.name.charAt(0).toUpperCase()}</span>
               <span>{item.name}</span>
-              {item.workspaceId === selected.workspaceId && <PickerMark selected />}
             </button>)}
           </div>}
         </div>
