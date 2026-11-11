@@ -21,7 +21,7 @@
 .eyebrow { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .16em; }
 .form { display: grid; gap: 9px; margin: 20px 0; }
 .form label { font-size: 12px; font-weight: 700; }
-.form input, .workspacePicker select {
+.form input {
   width: 100%; min-height: 40px; padding: 8px 10px;
   border: 1px solid #666482; border-radius: 8px;
   background: #20243a; color: #fff; font: inherit;
@@ -42,9 +42,27 @@
 
   button { display: block; margin: 8px 0 0 auto; border: 0; background: transparent; color: #eafff6; cursor: pointer; }
 }
-.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.workspacePicker select { max-width: min(220px, 30vw); min-height: 36px; cursor: pointer; }
-.management { width: 100%; max-width: 1080px; margin: 0 auto; }
+.workspacePicker { position: relative; min-width: 0; }
+.workspacePicker > button, .pickerOptions button { display: flex; align-items: center; gap: 9px; color: #f5f3ff; font: inherit; cursor: pointer; }
+.workspacePicker > button {
+  max-width: min(250px, 30vw); min-height: 38px; padding: 5px 9px;
+  border: 1px solid #555a79; border-radius: 10px; background: #2b304a;
+}
+.workspacePicker > button:hover, .workspacePicker > button[aria-expanded='true'] { border-color: var(--accent); background: #343751; }
+.workspacePicker button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pickerName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickerIcon { display: grid; flex: 0 0 25px; place-items: center; height: 25px; border-radius: 7px; background: var(--accent); color: var(--sidebar); font-size: 12px; font-weight: 800; }
+.pickerChevron { margin-left: auto; color: var(--accent); font-size: 18px; line-height: 1; }
+.pickerOptions {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
+  width: max(100%, 220px); max-width: min(340px, calc(100vw - 32px)); max-height: min(360px, 60dvh); overflow-y: auto;
+  padding: 6px; border: 1px solid #5d5b7c; border-radius: 12px; background: #292d46; box-shadow: 0 18px 40px #10122499;
+}
+.pickerOptions button { width: 100%; min-height: 40px; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
+.pickerOptions button:hover, .pickerOptions .selectedOption { background: #474169; }
+.pickerOptions button > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.optionCheck { margin-left: auto; color: var(--accent); font-weight: 800; }
+.management { width: 100%; min-width: 0; }
 .managementHeading { margin-bottom: 30px; }
 .managementHeading h1 { margin: 10px 0; font-size: clamp(28px, 4vw, 42px); letter-spacing: -.04em; }
 .managementHeading > p:last-child, .helper, .empty { color: var(--soft-text); line-height: 1.6; }
@@ -69,8 +87,10 @@
 .invites button { flex: 0 0 auto; padding: 7px 10px; border: 1px solid #8d5c67; border-radius: 8px; background: transparent; color: #ffb4b4; cursor: pointer; }
 .localLink { overflow-wrap: anywhere; }
 .localLink a { color: var(--accent); }
-@media (max-width: 760px) {
+@media (max-width: 1100px) {
   .managementGrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
   .managementCard { padding: 20px; }
-  .workspacePicker select { max-width: 125px; }
+  .workspacePicker > button { max-width: 132px; }
 }

@@ -34,8 +34,10 @@ try {
   const title = () => screen.getByRole('heading', { level: 1 }).textContent;
   assert.equal(title(), '# 전체');
 
+  screen.getByRole('main').scrollTop = 120;
   await user.click(screen.getByRole('button', { name: '업무 보드' }));
   assert.equal(title(), '업무 보드');
+  assert.equal(screen.getByRole('main').scrollTop, 0);
   assert.equal(useWorkspaceNavigationStore.getState().activeView, 'board');
 
   await user.click(screen.getByRole('button', { name: '팀원 A' }));

@@ -13,7 +13,7 @@ globalThis.Node = dom.window.Node;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
 
-const { act, cleanup, render, screen } = await import('@testing-library/react');
+const { act, cleanup, render, screen, within } = await import('@testing-library/react');
 const userEvent = (await import('@testing-library/user-event')).default;
 const server = await createServer({ root: process.cwd(), mode: 'emulator', server: { middlewareMode: true } });
 
@@ -53,6 +53,15 @@ try {
   await screen.findByText('member@example.test');
   assert.ok(screen.getByRole('heading', { name: '초대 현황' }));
   assert.ok(screen.getByLabelText('이메일 주소'));
+  assert.deepEqual(within(screen.getByRole('main')).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent), [
+    '멤버 초대', '새 워크스페이스', '초대 현황', '워크스페이스 멤버',
+  ]);
+  await user.type(screen.getByLabelText('워크스페이스 이름'), 'Second Team');
+  await user.click(screen.getByRole('button', { name: '새 공간 만들기' }));
+  await screen.findByRole('heading', { name: 'Second Team 관리' }, { timeout: 10000 });
+  await user.click(screen.getByRole('button', { name: '워크스페이스 선택' }));
+  await user.click(within(screen.getByRole('group', { name: '워크스페이스 목록' })).getByRole('button', { name: /Email Team/ }));
+  await screen.findByRole('heading', { name: 'Email Team 관리' });
 
   await user.click(screen.getByRole('button', { name: '계정' }));
   assert.match(screen.getByLabelText('계정 설정').textContent, /이메일·비밀번호/);

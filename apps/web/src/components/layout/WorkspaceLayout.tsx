@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   demoChannels,
   demoDirectMessages,
@@ -22,6 +22,7 @@ const viewTabs: { id: AppView; label: string }[] = [
 ];
 
 export function WorkspaceLayout({ children, accountControls, workspaceName, canManageWorkspace = false }: WorkspaceLayoutProps) {
+  const mainRef = useRef<HTMLElement>(null);
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
   const setView = useWorkspaceNavigationStore((state) => state.setView);
@@ -29,6 +30,8 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
   const currentTitle = activeView === 'workspace' ? '워크스페이스 관리' : activeView === 'chat'
     ? `${selectedConversation.kind === 'channel' ? '# ' : ''}${getConversationName(selectedConversation)}`
     : viewTabs.find(({ id }) => id === activeView)?.label;
+
+  useEffect(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, [activeView, workspaceName]);
 
   return (
     <div className={styles.shell}>
@@ -127,7 +130,7 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
             {accountControls}
           </div>
         </header>
-        <main id="main-content" className={styles.main}>
+        <main id="main-content" className={styles.main} ref={mainRef}>
           {children}
         </main>
       </div>
