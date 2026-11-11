@@ -11,13 +11,17 @@
 .dayMarker { width: fit-content; margin: 0 auto 24px; padding: 6px 12px; border: 1px solid #4e506d; border-radius: 999px; color: var(--muted); font-size: 11px; }
 .messageList { display: flex; flex-direction: column; gap: 22px; max-width: 900px; margin: 0 auto; padding: 0; list-style: none; }
 .message { display: flex; align-items: flex-start; gap: 12px; }
+.own { flex-direction: row-reverse; }
 .avatar { display: grid; flex: 0 0 38px; place-items: center; height: 38px; border-radius: 12px; background: #514f76; color: #fff; font-size: 13px; font-weight: 800; }
 .own .avatar { background: var(--accent); color: #20243a; }
 .messageBody { min-width: 0; padding-top: 1px; }
+.own .messageBody { display: flex; max-width: min(75%, 640px); flex-direction: column; align-items: flex-end; }
 .messageMeta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 5px; }
+.own .messageMeta { justify-content: flex-end; }
 .messageMeta strong { font-size: 13px; }
 .messageMeta time, .messageMeta span { color: var(--muted); font-size: 11px; }
 .messageBody p { margin: 0; color: #eeeefa; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; white-space: pre-wrap; }
+.own .messageBody p { max-width: 100%; padding: 10px 14px; border: 1px solid #625987; border-radius: 14px 4px 14px 14px; background: #403b60; text-align: left; }
 .failed { color: #ffb4b4 !important; }
 .retry { margin-top: 5px; padding: 0; border: 0; background: transparent; color: #ffb4b4; cursor: pointer; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 .composerWrap { flex: 0 0 auto; padding: 16px clamp(20px, 4vw, 48px) 20px; border-top: 1px solid var(--line); background: #22263d; }
@@ -32,6 +36,7 @@
   .header { min-height: 72px; }
   .previewTag { display: none; }
   .messages { padding-block: 20px; }
+  .own .messageBody { max-width: calc(100% - 50px); }
   .composerWrap { padding-bottom: 14px; }
   .composerHint span:last-child { display: none; }
 }
