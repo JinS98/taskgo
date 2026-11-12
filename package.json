@@ -9,6 +9,7 @@
     "shared/contracts"
   ],
   "scripts": {
+    "dev:all": "node scripts/dev-all.mjs",
     "dev:web": "npm run dev -w @taskgo/web",
     "dev:web:emulator": "npm run dev:emulator -w @taskgo/web",
     "build:web": "npm run build -w @taskgo/web",
