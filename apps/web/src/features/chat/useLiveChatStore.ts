@@ -58,7 +58,7 @@ export const useLiveChatStore = create<LiveChatState>()((set) => ({
     messagesByRoom: { ...state.messagesByRoom, [key]: (state.messagesByRoom[key] ?? []).map((item) => item.clientMessageId === clientMessageId ? { ...item, messageId, status: 'sent' } : item) },
   })),
   fail: (key, clientMessageId) => set((state) => ({
-    messagesByRoom: { ...state.messagesByRoom, [key]: (state.messagesByRoom[key] ?? []).map((item) => item.clientMessageId === clientMessageId ? { ...item, status: 'failed' } : item) },
+    messagesByRoom: { ...state.messagesByRoom, [key]: (state.messagesByRoom[key] ?? []).map((item) => item.clientMessageId === clientMessageId && !item.messageId ? { ...item, status: 'failed' } : item) },
   })),
   retry: (key, clientMessageId) => set((state) => ({
     messagesByRoom: { ...state.messagesByRoom, [key]: (state.messagesByRoom[key] ?? []).map((item) => item.clientMessageId === clientMessageId ? { ...item, status: 'sending' } : item) },

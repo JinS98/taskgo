@@ -50,6 +50,7 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
   useEffect(() => {
     let active = true;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let joinTimer: ReturnType<typeof setTimeout> | undefined;
     const socket: ChatSocket = io(socketUrl, {
       autoConnect: false,
       auth: (callback) => {
@@ -60,39 +61,89 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
     });
     socketRef.current = socket;
 
+    function scheduleReconnect() {
+      if (!active || retryTimer || !navigator.onLine) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        if (active && !socket.connected) socket.connect();
+      }, 1500);
+    }
+
+    function scheduleJoinRetry() {
+      if (!active || joinTimer || !navigator.onLine) return;
+      joinTimer = setTimeout(() => {
+        joinTimer = undefined;
+        if (active && socket.connected) void join();
+      }, 1500);
+    }
+
     async function join() {
       try {
         const result = await socket.timeout(10000).emitWithAck('room:join', target);
         if (!active) return;
-        if (!result.ok) { setConnection('error'); setError(readableError(result)); return; }
+        if (!result.ok) {
+          setConnection('error');
+          setError(readableError(result));
+          if (result.error.code === 'INTERNAL_ERROR') scheduleJoinRetry();
+          return;
+        }
+        if (joinTimer) clearTimeout(joinTimer);
+        joinTimer = undefined;
         setConnection('ready');
         setError('');
         void refreshHistory();
       } catch {
-        if (active) { setConnection('error'); setError('대화방에 연결하지 못했습니다. 다시 시도해 주세요.'); }
+        if (active) { setConnection('error'); setError('대화방에 연결하지 못했습니다. 다시 시도해 주세요.'); scheduleJoinRetry(); }
       }
     }
 
-    socket.on('connect', () => { if (active) { setConnection('connecting'); void join(); } });
+    socket.on('connect', () => {
+      if (!active) return;
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = undefined;
+      setConnection('connecting');
+      void join();
+    });
     socket.on('connect_error', (cause) => {
       if (!active) return;
       setConnection('error');
       const code = (cause as Error & { data?: { code?: string } }).data?.code;
       setError(code === 'UNAUTHENTICATED' ? '로그인 상태를 갱신한 뒤 다시 연결해 주세요.' : '채팅 서버에 연결하지 못했습니다. 서버 상태를 확인해 주세요.');
+      if (code !== 'UNAUTHENTICATED' && !socket.active) scheduleReconnect();
     });
     socket.on('disconnect', (reason) => {
       if (!active) return;
       setConnection('connecting');
-      if (reason === 'io server disconnect') retryTimer = setTimeout(() => socket.connect(), 700);
+      if (joinTimer) clearTimeout(joinTimer);
+      joinTimer = undefined;
+      if (reason === 'io server disconnect') scheduleReconnect();
     });
     socket.on('message:created', (message) => {
       if (active && message.workspaceId === workspaceId && message.kind === conversation.kind && message.roomId === conversation.id) receive(key, message);
     });
+    function onOffline() {
+      if (!active) return;
+      setConnection('connecting');
+      setError('인터넷 연결을 기다리는 중입니다.');
+      socket.disconnect();
+    }
+    function onOnline() {
+      if (!active) return;
+      setError('');
+      setConnection('connecting');
+      if (!socket.connected) socket.connect();
+      else void join();
+    }
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
     socket.connect();
 
     return () => {
       active = false;
       if (retryTimer) clearTimeout(retryTimer);
+      if (joinTimer) clearTimeout(joinTimer);
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
       if (socket.connected) socket.emit('room:leave', target, () => {});
       socket.disconnect();
       socket.removeAllListeners();

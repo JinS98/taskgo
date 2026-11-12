@@ -18,6 +18,7 @@ export function useRoomHistory(
   const [error, setError] = useState('');
   const cursorRef = useRef<MessageCursor | undefined>(undefined);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const refreshAgainRef = useRef(false);
   const generationRef = useRef(0);
   const atBottomRef = useRef(true);
   const anchorRef = useRef<{ height: number; top: number } | null>(null);
@@ -40,8 +41,11 @@ export function useRoomHistory(
     if (element) atBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100;
   }, [scrollRef]);
 
-  const refresh = useCallback((): Promise<void> => {
-    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+  const refresh = useCallback(function run(): Promise<void> {
+    if (refreshPromiseRef.current) {
+      refreshAgainRef.current = true;
+      return refreshPromiseRef.current;
+    }
     const generation = generationRef.current;
     const task = (async () => {
       setLoading(true);
@@ -67,7 +71,14 @@ export function useRoomHistory(
       }
     })();
     refreshPromiseRef.current = task;
-    void task.finally(() => { if (refreshPromiseRef.current === task) refreshPromiseRef.current = null; });
+    void task.finally(() => {
+      if (refreshPromiseRef.current !== task) return;
+      refreshPromiseRef.current = null;
+      if (refreshAgainRef.current && generation === generationRef.current) {
+        refreshAgainRef.current = false;
+        void run();
+      }
+    });
     return task;
   }, [auth.app, mergeHistory, roomKey, target]);
 
@@ -95,7 +106,7 @@ export function useRoomHistory(
 
   useEffect(() => {
     void refresh();
-    return () => { generationRef.current += 1; refreshPromiseRef.current = null; };
+    return () => { generationRef.current += 1; refreshPromiseRef.current = null; refreshAgainRef.current = false; };
   }, [refresh]);
 
   return { loading, loadingOlder, hasMore, error, refresh, loadOlder, onScroll };

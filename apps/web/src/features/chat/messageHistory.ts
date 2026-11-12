@@ -1,4 +1,4 @@
-import { collection, documentId, getDocs, limit, orderBy, query, startAfter, where, type DocumentData, type Firestore, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, documentId, getDocsFromServer, limit, orderBy, query, startAfter, where, type DocumentData, type Firestore, type QueryDocumentSnapshot } from 'firebase/firestore';
 import type { CreatedMessage, RoomTarget } from '@taskgo/contracts';
 
 export const MESSAGE_PAGE_SIZE = 30;
@@ -15,7 +15,7 @@ export async function fetchMessagePage(db: Firestore, target: RoomTarget, after?
     ...(after ? [startAfter(after)] : []),
     limit(MESSAGE_PAGE_SIZE),
   ];
-  const snapshot = await getDocs(query(collection(db, 'messages'), ...conditions));
+  const snapshot = await getDocsFromServer(query(collection(db, 'messages'), ...conditions));
   const messages = snapshot.docs.map((item): CreatedMessage => {
     const data = item.data();
     return {

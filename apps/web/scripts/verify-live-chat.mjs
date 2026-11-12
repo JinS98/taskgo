@@ -123,6 +123,23 @@ try {
   await visibleOnce(memberPage, 'owner channel message');
   await send(memberPage, 'member channel reply');
   await visibleOnce(ownerPage, 'member channel reply');
+  await ownerPage.context().setOffline(true);
+  await ownerPage.getByText('연결 중…').waitFor({ timeout: 10000 });
+  await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('owner draft after outage');
+  assert.equal(await ownerPage.getByRole('button', { name: '전송', exact: true }).isDisabled(), true);
+  for (let index = 0; index < 35; index += 1) {
+    const content = `offline gap ${index}`;
+    await send(memberPage, content);
+    await memberPage.getByRole('listitem').filter({ hasText: content }).getByText('전송됨').waitFor();
+  }
+  await ownerPage.context().setOffline(false);
+  await ownerPage.getByText('실시간 연결됨').waitFor({ timeout: 30000 });
+  await visibleOnce(ownerPage, 'offline gap 0');
+  await visibleOnce(ownerPage, 'offline gap 34');
+  assert.equal(await ownerPage.getByText(/^offline gap \d+$/).count(), 35, 'All missed messages should be restored exactly once.');
+  assert.equal(await ownerPage.getByRole('textbox', { name: '메시지 입력' }).inputValue(), 'owner draft after outage');
+  await ownerPage.getByRole('button', { name: '전송', exact: true }).click();
+  await visibleOnce(memberPage, 'owner draft after outage');
   await ownerPage.goto('about:blank');
   await send(memberPage, 'message while owner away');
   await ownerPage.goto(`${origin}/workspace`);
@@ -146,7 +163,7 @@ try {
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await ownerPage.reload();
   await ownerPage.getByText('실시간 연결됨').waitFor();
-  await visibleOnce(ownerPage, 'member channel reply');
+  await visibleOnce(ownerPage, 'offline gap 34');
   assert.ok((await db.collection('messages').get()).size >= 70);
   assert.deepEqual(browserErrors, []);
   console.log('PASS: two Chrome sessions loaded paginated channel and DM history, preserved scroll, recovered missed messages, and exchanged live messages.');
