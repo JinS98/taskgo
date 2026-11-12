@@ -69,6 +69,19 @@ try {
     batch.set(db.doc(`users/${user.uid}/workspaces/${workspaceId}`), { workspaceId, name: 'Live Team', role, joinedAt: Timestamp.now() });
   }
   batch.set(db.doc('dmRooms/live-dm'), { workspaceId, participantIds: [owner.uid, member.uid] });
+  const historyStart = Date.now() - 120000;
+  for (let index = 0; index < 65; index += 1) {
+    batch.set(db.doc(`messages/history-channel-${index}`), {
+      workspaceId, sourceType: 'channel', channelId: `general_${workspaceId}`,
+      senderId: owner.uid, clientMessageId: `history-${index}`,
+      content: `history channel ${index}`, createdAt: Timestamp.fromMillis(historyStart + index * 1000),
+    });
+  }
+  batch.set(db.doc('messages/history-dm'), {
+    workspaceId, sourceType: 'dm', dmRoomId: 'live-dm',
+    senderId: member.uid, clientMessageId: 'history-dm',
+    content: 'earlier direct message', createdAt: Timestamp.fromMillis(historyStart),
+  });
   await batch.commit();
 
   const [socketPort, vitePort] = await Promise.all([availablePort(), availablePort()]);
@@ -92,15 +105,33 @@ try {
   await login(ownerPage, origin, owner.email);
   await login(memberPage, origin, member.email);
   assert.equal((await db.doc(`channels/general_${workspaceId}`).get()).get('name'), '전체');
+  await visibleOnce(ownerPage, 'history channel 64');
+  assert.equal(await ownerPage.getByText('history channel 34', { exact: true }).count(), 0);
+  const messageList = ownerPage.getByLabel('메시지 목록');
+  await messageList.evaluate((element) => { element.scrollTop = 0; });
+  const initialHeight = await messageList.evaluate((element) => element.scrollHeight);
+  await ownerPage.getByRole('button', { name: '이전 대화 불러오기' }).click();
+  await visibleOnce(ownerPage, 'history channel 34');
+  const afterOlder = await messageList.evaluate((element) => ({ top: element.scrollTop, height: element.scrollHeight }));
+  assert.ok(afterOlder.height > initialHeight && afterOlder.top > 0, 'Loading older messages should preserve scroll position.');
+  await ownerPage.getByRole('button', { name: '이전 대화 불러오기' }).click();
+  await visibleOnce(ownerPage, 'history channel 0');
+  assert.equal(await ownerPage.getByRole('button', { name: '이전 대화 불러오기' }).count(), 0);
 
   await send(ownerPage, 'owner channel message');
   await visibleOnce(ownerPage, 'owner channel message');
   await visibleOnce(memberPage, 'owner channel message');
   await send(memberPage, 'member channel reply');
   await visibleOnce(ownerPage, 'member channel reply');
+  await ownerPage.goto('about:blank');
+  await send(memberPage, 'message while owner away');
+  await ownerPage.goto(`${origin}/workspace`);
+  await visibleOnce(ownerPage, 'message while owner away');
 
   await ownerPage.getByRole('button', { name: member.email }).click();
   await memberPage.getByRole('button', { name: owner.email }).click();
+  await visibleOnce(ownerPage, 'earlier direct message');
+  await visibleOnce(memberPage, 'earlier direct message');
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await memberPage.getByText('실시간 연결됨').waitFor();
   await send(ownerPage, 'owner direct message');
@@ -113,9 +144,12 @@ try {
   await ownerPage.getByRole('button', { name: member.email }).click();
   await visibleOnce(ownerPage, 'owner direct message');
   await ownerPage.getByText('실시간 연결됨').waitFor();
-  assert.ok((await db.collection('messages').get()).size >= 4);
+  await ownerPage.reload();
+  await ownerPage.getByText('실시간 연결됨').waitFor();
+  await visibleOnce(ownerPage, 'member channel reply');
+  assert.ok((await db.collection('messages').get()).size >= 70);
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions joined a channel, exchanged messages, switched rooms, and isolated DM state.');
+  console.log('PASS: two Chrome sessions loaded paginated channel and DM history, preserved scroll, recovered missed messages, and exchanged live messages.');
 } finally {
   await browser?.close();
   await vite?.close();

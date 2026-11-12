@@ -5,6 +5,7 @@ import type { ClientToServerEvents, RoomTarget, ServerToClientEvents, SocketAck 
 import { socketUrl } from '../../config/env';
 import { getConversationName, type ConversationSelection } from './demoConversations';
 import { liveRoomKey, useLiveChatStore, type LiveChatMessage } from './useLiveChatStore';
+import { useRoomHistory } from './useRoomHistory';
 import styles from './ChatPanel.module.scss';
 
 type ChatSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -41,6 +42,8 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
   const [error, setError] = useState('');
   const socketRef = useRef<ChatSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const history = useRoomHistory(auth, target, key, messages, scrollRef);
+  const refreshHistory = history.refresh;
   const conversationName = getConversationName(conversation);
   const title = `${conversation.kind === 'channel' ? '# ' : ''}${conversationName}`;
 
@@ -64,6 +67,7 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
         if (!result.ok) { setConnection('error'); setError(readableError(result)); return; }
         setConnection('ready');
         setError('');
+        void refreshHistory();
       } catch {
         if (active) { setConnection('error'); setError('대화방에 연결하지 못했습니다. 다시 시도해 주세요.'); }
       }
@@ -94,11 +98,7 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
       socket.removeAllListeners();
       if (socketRef.current === socket) socketRef.current = null;
     };
-  }, [auth, conversation.id, conversation.kind, key, receive, target, viewerId, workspaceId]);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [key, messages.length]);
+  }, [auth, conversation.id, conversation.kind, key, receive, refreshHistory, target, viewerId, workspaceId]);
 
   async function send(message: LiveChatMessage) {
     const socket = socketRef.current;
@@ -145,8 +145,14 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
       <span className={styles.previewTag} role="status">{connection === 'ready' ? '실시간 연결됨' : connection === 'connecting' ? '연결 중…' : '연결 오류'}</span>
     </header>
     {error && <div className={styles.connectionError} role="alert">{error}<button type="button" onClick={() => { setError(''); setConnection('connecting'); if (socketRef.current?.connected) socketRef.current.disconnect(); socketRef.current?.connect(); }}>다시 연결</button></div>}
-    <div className={styles.messages} ref={scrollRef} aria-label="메시지 목록">
-      <p className={styles.dayMarker}>현재 연결 이후의 대화</p>
+    {history.error && <div className={styles.connectionError} role="alert">{history.error}<button type="button" onClick={() => void history.refresh()}>다시 불러오기</button></div>}
+    <div className={styles.messages} ref={scrollRef} onScroll={history.onScroll} aria-label="메시지 목록">
+      <div className={styles.historyControls}>
+        {history.loading && <span role="status">이전 대화 불러오는 중…</span>}
+        {!history.loading && history.hasMore && <button type="button" disabled={history.loadingOlder} onClick={() => void history.loadOlder()}>{history.loadingOlder ? '불러오는 중…' : '이전 대화 불러오기'}</button>}
+        {!history.loading && !history.hasMore && messages.length > 0 && <span>대화의 시작</span>}
+        {!history.loading && messages.length === 0 && <span>아직 대화가 없습니다.</span>}
+      </div>
       <ol className={styles.messageList}>
         {messages.map((message) => {
           const own = message.senderId === viewerId;

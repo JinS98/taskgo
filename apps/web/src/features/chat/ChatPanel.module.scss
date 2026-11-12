@@ -42,3 +42,8 @@
   .composerWrap { padding-bottom: 14px; }
   .composerHint span:last-child { display: none; }
 }
+
+.historyControls { display: flex; justify-content: center; min-height: 34px; margin: 0 auto 22px; color: var(--muted); font-size: 12px; }
+.historyControls span, .historyControls button { align-self: center; }
+.historyControls button { padding: 7px 12px; border: 1px solid #615a83; border-radius: 999px; background: #292d46; color: #cec3ff; cursor: pointer; font: inherit; font-weight: 700; }
+.historyControls button:disabled { cursor: wait; opacity: .6; }

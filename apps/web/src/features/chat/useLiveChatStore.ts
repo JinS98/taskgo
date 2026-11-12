@@ -21,11 +21,32 @@ interface LiveChatState {
   fail: (key: string, clientMessageId: string) => void;
   retry: (key: string, clientMessageId: string) => void;
   receive: (key: string, message: CreatedMessage) => void;
+  mergeHistory: (key: string, messages: CreatedMessage[]) => void;
   resetChat: () => void;
 }
 
 export function liveRoomKey(viewerId: string, target: RoomTarget): string {
   return `${viewerId}:${target.workspaceId}:${target.kind}:${target.roomId}`;
+}
+
+function mergeMessages(current: LiveChatMessage[], incoming: CreatedMessage[]): LiveChatMessage[] {
+  const merged = [...current];
+  for (const message of incoming) {
+    const next: LiveChatMessage = {
+      clientMessageId: message.clientMessageId,
+      messageId: message.messageId,
+      senderId: message.senderId,
+      content: message.content,
+      createdAt: Date.parse(message.createdAt),
+      status: 'sent',
+    };
+    const index = merged.findIndex((item) => item.messageId === message.messageId
+      || (item.senderId === message.senderId && item.clientMessageId === message.clientMessageId));
+    if (index < 0) merged.push(next);
+    else merged[index] = next;
+  }
+  return merged.sort((a, b) => a.createdAt - b.createdAt
+    || (a.messageId ?? a.clientMessageId).localeCompare(b.messageId ?? b.clientMessageId));
 }
 
 export const useLiveChatStore = create<LiveChatState>()((set) => ({
@@ -42,19 +63,11 @@ export const useLiveChatStore = create<LiveChatState>()((set) => ({
   retry: (key, clientMessageId) => set((state) => ({
     messagesByRoom: { ...state.messagesByRoom, [key]: (state.messagesByRoom[key] ?? []).map((item) => item.clientMessageId === clientMessageId ? { ...item, status: 'sending' } : item) },
   })),
-  receive: (key, message) => set((state) => {
-    const current = state.messagesByRoom[key] ?? [];
-    const next: LiveChatMessage = {
-      clientMessageId: message.clientMessageId,
-      messageId: message.messageId,
-      senderId: message.senderId,
-      content: message.content,
-      createdAt: Date.parse(message.createdAt),
-      status: 'sent',
-    };
-    const index = current.findIndex((item) => item.messageId === message.messageId || (item.senderId === message.senderId && item.clientMessageId === message.clientMessageId));
-    const messages = index < 0 ? [...current, next] : current.map((item, position) => position === index ? next : item);
-    return { messagesByRoom: { ...state.messagesByRoom, [key]: messages } };
-  }),
+  receive: (key, message) => set((state) => ({
+    messagesByRoom: { ...state.messagesByRoom, [key]: mergeMessages(state.messagesByRoom[key] ?? [], [message]) },
+  })),
+  mergeHistory: (key, messages) => set((state) => ({
+    messagesByRoom: { ...state.messagesByRoom, [key]: mergeMessages(state.messagesByRoom[key] ?? [], messages) },
+  })),
   resetChat: () => set({ messagesByRoom: {}, draftsByRoom: {} }),
 }));

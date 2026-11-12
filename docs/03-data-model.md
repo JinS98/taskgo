@@ -14,6 +14,8 @@
 - `notifications/{id}`: recipientId, taskId, reviewCycle, type, scheduledAt, sentAt
 - `meetings/{id}`: workspaceId, title, startsAt, endsAt
 
+메시지 내역은 `workspaceId`·`sourceType`·`channelId` 또는 `dmRoomId`로 룸을 제한하고, `createdAt`과 문서 ID의 내림차순으로 30개씩 조회한다. 동시각 메시지도 문서 ID로 정렬이 고정된다. 필요한 채널·DM 복합 인덱스는 `firestore.indexes.json`에 정의한다. 클라이언트의 직접 쓰기 금지와 룸별 읽기 권한은 Firestore 규칙에서 유지한다.
+
 ## 권한
 - 워크스페이스 장만 초대를 발송·철회·조회한다. 초대 수락은 서버 트랜잭션에서 로그인 이메일 확인 여부·초대 이메일 일치·토큰 해시·만료·사용 여부·멤버십 중복을 검증하고 멤버십·목록 미러·초대 상태를 한 번에 기록한다. 초대 기한은 7일이다.
 - 워크스페이스 생성은 초대 메일과 독립적이다. Firestore 규칙은 인증된 이메일·생성자 UID·장 역할·필드 구성·서버 타임스탬프를 검증하고 3문서 일괄 쓰기가 누락되면 거부한다.
