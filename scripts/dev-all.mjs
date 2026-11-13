@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const emulatorData = resolve(root, '.taskgo-emulator-data');
 const children = [];
 const npmCli = process.env.npm_execpath;
 const fixedPorts = [3001, 9099, 8080, 5001, 4000, 4400, 4500, 9150, 9299, 9499];
@@ -124,7 +125,9 @@ async function main() {
   await runBuild('build:socket');
   await runBuild('prepare:emulator');
 
-  const emulator = start('Firebase 에뮬레이터', [resolve(root, 'node_modules/firebase-tools/lib/bin/firebase.js'), 'emulators:start', '--only', 'auth,firestore,functions', '--project', 'demo-taskgo'], { env: emulatorEnv });
+  const emulatorArgs = [resolve(root, 'node_modules/firebase-tools/lib/bin/firebase.js'), 'emulators:start', '--only', 'auth,firestore,functions', '--project', 'demo-taskgo'];
+  if (existsSync(join(emulatorData, 'firebase-export-metadata.json'))) emulatorArgs.push('--import', emulatorData);
+  const emulator = start('Firebase 에뮬레이터', emulatorArgs, { env: emulatorEnv });
   await waitFor('Firebase 에뮬레이터', async () => (await Promise.all([9099, 8080, 5001].map((port) => occupied(port, '127.0.0.1')))).every(Boolean), emulator);
 
   const socket = start('채팅 서버', [resolve(root, 'apps/socket-server/dist/index.js')], {

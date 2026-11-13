@@ -11,5 +11,6 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 firebase.auth.local.json
+.taskgo-emulator-data/
 coverage/
 .DS_Store

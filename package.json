@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "dev:all": "node scripts/dev-all.mjs",
+    "save:emulator": "firebase emulators:export .taskgo-emulator-data --only auth,firestore --force --project demo-taskgo",
     "dev:web": "npm run dev -w @taskgo/web",
     "dev:web:emulator": "npm run dev:emulator -w @taskgo/web",
     "build:web": "npm run build -w @taskgo/web",
