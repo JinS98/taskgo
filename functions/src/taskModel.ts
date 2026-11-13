@@ -4,9 +4,9 @@ import type { CreateTaskRequest, TaskRecord, TaskSourceType } from '@taskgo/cont
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const requiredFields = ['workspaceId', 'sourceMessageId', 'title', 'assigneeId', 'dueDate', 'reviewRequired'];
-const allowedFields = new Set([...requiredFields, 'reviewWorkingDays', 'estimatedMinutes']);
+const allowedFields = new Set([...requiredFields, 'reviewWorkingDays', 'estimatedMinutes', 'description']);
 
-function parseCreateTaskRequest(value: unknown): CreateTaskRequest & { due: Timestamp; reviewDays: number | null; estimate: number | null } {
+function parseCreateTaskRequest(value: unknown): CreateTaskRequest & { due: Timestamp; reviewDays: number | null; estimate: number | null; description: string | null } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HttpsError('invalid-argument', '업무 정보를 확인해 주세요.');
   const data = value as Record<string, unknown>;
   if (requiredFields.some((key) => !(key in data)) || Object.keys(data).some((key) => !allowedFields.has(key))) {
@@ -17,6 +17,10 @@ function parseCreateTaskRequest(value: unknown): CreateTaskRequest & { due: Time
   }
   if (typeof data.title !== 'string' || data.title.trim().length < 2 || data.title.trim().length > 160) {
     throw new HttpsError('invalid-argument', '업무 제목은 2~160자로 입력해 주세요.');
+  }
+  const description = data.description ?? null;
+  if (description !== null && (typeof description !== 'string' || description.trim().length > 2000)) {
+    throw new HttpsError('invalid-argument', '업무 설명은 2000자 이내로 입력해 주세요.');
   }
   if (typeof data.dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(data.dueDate)) {
     throw new HttpsError('invalid-argument', '마감일은 UTC ISO 시각으로 입력해 주세요.');
@@ -38,6 +42,7 @@ function parseCreateTaskRequest(value: unknown): CreateTaskRequest & { due: Time
     workspaceId: data.workspaceId as string,
     sourceMessageId: data.sourceMessageId as string,
     title: (data.title as string).trim(),
+    description: typeof description === 'string' ? description.trim() || null : null,
     assigneeId: data.assigneeId as string,
     dueDate: data.dueDate,
     reviewRequired: data.reviewRequired,
@@ -80,6 +85,7 @@ export async function createTaskRecord(db: Firestore, requesterId: string, value
       sourceMessageId: input.sourceMessageId,
       sourceType: sourceType as TaskSourceType,
       title: input.title,
+      description: input.description,
       requesterId,
       assigneeId: input.assigneeId,
       dueDate: input.due,

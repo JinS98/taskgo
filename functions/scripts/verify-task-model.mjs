@@ -68,7 +68,7 @@ try {
   await batch.commit();
 
   const dueDate = new Date(Date.now() + 86400000).toISOString();
-  const input = { workspaceId, sourceMessageId: 'task-channel-source', title: '  모델 검증 업무  ', assigneeId: assignee.user.uid, dueDate, reviewRequired: false };
+  const input = { workspaceId, sourceMessageId: 'task-channel-source', title: '  모델 검증 업무  ', description: '  검토 메모  ', assigneeId: assignee.user.uid, dueDate, reviewRequired: false };
   await rejected(outsider.create(input), 'permission-denied');
   await rejected(unverified.create(input), 'permission-denied');
   await rejected(owner.create({ ...input, requesterId: outsider.user.uid }), 'invalid-argument');
@@ -79,6 +79,7 @@ try {
   await rejected(owner.create({ ...input, reviewRequired: true }), 'invalid-argument');
   await rejected(owner.create({ ...input, reviewWorkingDays: 2 }), 'invalid-argument');
   await rejected(owner.create({ ...input, estimatedMinutes: 17 }), 'invalid-argument');
+  await rejected(owner.create({ ...input, description: '가'.repeat(2001) }), 'invalid-argument');
   await rejected(owner.create({ ...input, sourceMessageId: 'task-foreign-source' }), 'permission-denied');
   await rejected(owner.create({ ...input, sourceMessageId: 'task-dm-source' }), 'permission-denied');
 
@@ -87,6 +88,7 @@ try {
   assert.equal(channelTask.get('requesterId'), owner.user.uid);
   assert.equal(channelTask.get('assigneeId'), assignee.user.uid);
   assert.equal(channelTask.get('title'), '모델 검증 업무');
+  assert.equal(channelTask.get('description'), '검토 메모');
   assert.equal(channelTask.get('status'), 'REQUESTED');
   assert.equal(channelTask.get('sourceType'), 'channel');
   assert.equal(channelTask.get('sourceMessageId'), 'task-channel-source');
@@ -102,13 +104,14 @@ try {
   assert.equal('content' in channelTask.data(), false);
   assert.equal('dmRoomId' in channelTask.data(), false);
 
-  const dmTaskId = (await member.create({ ...input, sourceMessageId: 'task-dm-source', title: 'DM에서 만든 공개 업무', reviewRequired: true, reviewWorkingDays: 2, estimatedMinutes: 90 })).data.taskId;
+  const dmTaskId = (await member.create({ ...input, sourceMessageId: 'task-dm-source', title: 'DM에서 만든 공개 업무', description: null, reviewRequired: true, reviewWorkingDays: 2, estimatedMinutes: 90 })).data.taskId;
   const dmTask = await adminDb.doc(`tasks/${dmTaskId}`).get();
   assert.equal(dmTask.get('requesterId'), member.user.uid);
   assert.equal(dmTask.get('sourceType'), 'dm');
   assert.equal(dmTask.get('reviewRequired'), true);
   assert.equal(dmTask.get('reviewWorkingDays'), 2);
   assert.equal(dmTask.get('estimatedMinutes'), 90);
+  assert.equal(dmTask.get('description'), null);
   assert.equal('content' in dmTask.data(), false);
   assert.equal('dmRoomId' in dmTask.data(), false);
   assert.equal((await getDoc(doc(owner.db, 'tasks', dmTaskId))).data().title, 'DM에서 만든 공개 업무');

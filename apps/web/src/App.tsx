@@ -6,6 +6,7 @@ import { WorkspaceLayout } from './components/layout/WorkspaceLayout';
 import { ChatPanel } from './features/chat/ChatPanel';
 import { LiveChatPanel } from './features/chat/LiveChatPanel';
 import { TaskBoardPanel } from './features/tasks/TaskBoardPanel';
+import { TaskCalendarPanel } from './features/tasks/TaskCalendarPanel';
 import { defaultChannelId, type ConversationSelection } from './features/chat/demoConversations';
 import { useWorkspaceConversations } from './features/chat/useWorkspaceConversations';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
@@ -31,7 +32,7 @@ const viewCopy: Record<Exclude<AppView, 'chat' | 'workspace'>, { eyebrow: string
   },
 };
 
-export default function App({ accountControls, auth, db, functions, workspaceId, workspaceName, userId, senderName, canManageWorkspace = false, workspaceManagement }: { accountControls?: ReactNode; auth?: Auth; db?: Firestore; functions?: Functions; workspaceId?: string; workspaceName?: string; userId?: string; senderName?: string; canManageWorkspace?: boolean; workspaceManagement?: ReactNode }) {
+export default function App({ workspaceControls, accountControls, auth, db, functions, workspaceId, workspaceName, userId, senderName, canManageWorkspace = false, workspaceManagement }: { workspaceControls?: ReactNode; accountControls?: ReactNode; auth?: Auth; db?: Firestore; functions?: Functions; workspaceId?: string; workspaceName?: string; userId?: string; senderName?: string; canManageWorkspace?: boolean; workspaceManagement?: ReactNode }) {
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
   const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
@@ -52,11 +53,12 @@ export default function App({ accountControls, auth, db, functions, workspaceId,
   const currentView = activeView === 'board' || activeView === 'calendar' ? viewCopy[activeView] : null;
 
   return (
-    <WorkspaceLayout accountControls={accountControls} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
+    <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
       {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && functions && workspaceId && userId
         ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} />
         : <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : activeView === 'board' && liveChat && auth && db && functions && workspaceId && userId
-          ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} memberEmails={memberEmails} /> : currentView && <>
+          ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} memberEmails={memberEmails} /> : activeView === 'calendar' && liveChat && db && workspaceId && userId
+            ? <TaskCalendarPanel key={workspaceId} db={db} workspaceId={workspaceId} viewerId={userId} /> : currentView && <>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>
         <h1 id="hero-title" aria-live="polite">{currentView.title}</h1>

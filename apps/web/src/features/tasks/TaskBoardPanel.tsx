@@ -7,10 +7,10 @@ import { respondTask, taskResponseError } from './taskResponseApi';
 import styles from './TaskBoardPanel.module.scss';
 
 type BoardTask = TaskRecord<Timestamp> & { id: string };
-type Filter = 'all' | 'requested' | 'accepted' | 'declined';
+type Filter = 'all' | 'requested' | 'active' | 'finished';
 const filters: { id: Filter; label: string }[] = [
   { id: 'all', label: '전체' }, { id: 'requested', label: '요청 대기' },
-  { id: 'accepted', label: '수락됨' }, { id: 'declined', label: '거절됨' },
+  { id: 'active', label: '수락·진행' }, { id: 'finished', label: '완료·거절' },
 ];
 const statusLabels: Record<TaskStatus, string> = {
   REQUESTED: '요청 대기', ACCEPTED: '수락됨', IN_PROGRESS: '진행 중',
@@ -62,6 +62,7 @@ function TaskCard({ task, auth, functions, viewerId, memberEmails, onNotice }: {
   return <article className={styles.card}>
     <div className={styles.cardTop}><span className={`${styles.status} ${task.status === 'REQUESTED' ? styles.requested : ''}`}>{statusLabels[task.status]}</span><span className={styles.due}>마감 {formatDate(task.dueDate)}</span></div>
     <h2>{task.title}</h2>
+    {task.description && <p className={styles.description}>{task.description}</p>}
     <div className={styles.meta}><span>요청 {memberEmails[task.requesterId] ?? '멤버'}</span><span>담당 {memberEmails[task.assigneeId] ?? '멤버'}</span>{task.estimatedMinutes && <span>예상 {task.estimatedMinutes}분</span>}{task.reviewRequired && <span>검수 필요</span>}</div>
     {task.proposedDueDate && <div className={styles.proposal}><strong>제안된 마감</strong><span>{formatDate(task.proposedDueDate)}</span><small>요청자가 승인하기 전까지 기존 마감일이 유지됩니다.</small></div>}
     {requested && isAssignee && !task.proposedDueDate && <div className={styles.actions}>
@@ -99,12 +100,17 @@ export function TaskBoardPanel({ auth, db, functions, workspaceId, viewerId, mem
   const loading = snapshotState?.workspaceId !== workspaceId;
   const tasks = loading ? [] : snapshotState?.tasks ?? [];
   const error = loading ? '' : snapshotState?.error ?? '';
-  const visible = tasks.filter((task) => filter === 'all' || filter === 'requested' && task.status === 'REQUESTED' || filter === 'accepted' && task.status !== 'REQUESTED' && task.status !== 'DECLINED' || filter === 'declined' && task.status === 'DECLINED');
+  const columns: { id: Filter; label: string; tasks: BoardTask[] }[] = [
+    { id: 'requested', label: '요청 대기', tasks: tasks.filter((task) => task.status === 'REQUESTED') },
+    { id: 'active', label: '수락·진행', tasks: tasks.filter((task) => !['REQUESTED', 'DECLINED', 'DONE'].includes(task.status)) },
+    { id: 'finished', label: '완료·거절', tasks: tasks.filter((task) => task.status === 'DONE' || task.status === 'DECLINED') },
+  ];
+  const visibleColumns = filter === 'all' ? columns : columns.filter((column) => column.id === filter);
   return <section className={styles.board} aria-labelledby="board-title">
     <div className={styles.heading}><div><p className={styles.eyebrow}>TASK BOARD</p><h1 id="board-title">업무 보드</h1><p>대화에서 요청한 업무를 확인하고 담당자와 마감일을 확정하세요.</p></div><span className={styles.count}>{tasks.length}개 업무</span></div>
     <div className={styles.filters} aria-label="업무 상태 필터">{filters.map((item) => <button key={item.id} type="button" aria-pressed={filter === item.id} className={filter === item.id ? styles.selected : ''} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
-    {loading ? <p className={styles.empty}>업무를 불러오는 중…</p> : visible.length === 0 ? <p className={styles.empty}>{tasks.length === 0 ? '아직 업무 요청이 없습니다. 채팅 메시지에서 업무를 만들어 보세요.' : '이 상태의 업무가 없습니다.'}</p> : <div className={styles.list}>{visible.map((task) => <TaskCard key={task.id} task={task} auth={auth} functions={functions} viewerId={viewerId} memberEmails={memberEmails} onNotice={setNotice} />)}</div>}
+    {loading ? <p className={styles.empty}>업무를 불러오는 중…</p> : tasks.length === 0 ? <p className={styles.empty}>아직 업무 요청이 없습니다. 채팅 메시지에서 업무를 만들어 보세요.</p> : <div className={styles.columns}>{visibleColumns.map((column) => <section className={styles.column} key={column.id} aria-label={column.label}><div className={styles.columnHeading}><h2>{column.label}</h2><span>{column.tasks.length}</span></div>{column.tasks.length ? column.tasks.map((task) => <TaskCard key={task.id} task={task} auth={auth} functions={functions} viewerId={viewerId} memberEmails={memberEmails} onNotice={setNotice} />) : <p className={styles.columnEmpty}>이 상태의 업무가 없습니다.</p>}</section>)}</div>}
   </section>;
 }

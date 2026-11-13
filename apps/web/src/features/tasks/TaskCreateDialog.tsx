@@ -25,6 +25,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
   const [dueLocal, setDueLocal] = useState('');
   const [estimatedMinutes, setEstimatedMinutes] = useState('');
@@ -71,6 +72,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
       workspaceId,
       sourceMessageId,
       title: trimmedTitle,
+      description: description.trim() || null,
       assigneeId,
       dueDate: new Date(dueMillis).toISOString(),
       estimatedMinutes: estimatedMinutes ? Number(estimatedMinutes) : null,
@@ -92,6 +94,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
       <div><p className={styles.eyebrow}>MESSAGE TO TASK</p><h2 id="task-dialog-title">업무 요청 만들기</h2></div>
       <button type="button" className={styles.close} aria-label="업무 요청 닫기" disabled={pending} onClick={onClose}>×</button>
     </div>
+    <div className={styles.scrollArea}>
     <div className={styles.source}>
       <strong>원본 {sourceKind === 'dm' ? 'DM' : '채널'} 메시지</strong>
       <p>{sourceContent}</p>
@@ -111,18 +114,22 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
         </button>)}
       </div>}
     </div>
-    <form className={styles.form} onSubmit={(event) => void submit(event)}>
+    <form id="task-create-form" className={styles.form} onSubmit={(event) => void submit(event)}>
       <label className={styles.field}>업무 제목<input ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required placeholder="팀에 공개할 업무 제목" /></label>
       <div className={styles.row}>
         <label className={styles.field}>담당자<select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required><option value="">담당자를 선택하세요</option>{assignees.map(([uid, email]) => <option key={uid} value={uid}>{email}</option>)}</select></label>
         <label className={styles.field}>마감 날짜·시간<input type="datetime-local" value={dueLocal} onChange={(event) => setDueLocal(event.target.value)} min={localDateTime(new Date())} required /></label>
       </div>
+      <label className={styles.field}>설명<textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={3} placeholder="업무에 필요한 내용을 적어 주세요" /></label>
       <div className={styles.row}>
         <label className={styles.field}>예상 작업 시간<select value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">선택 안 함</option>{estimateOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes}분` : `${minutes / 60}시간`}</option>)}</select></label>
         <div className={styles.review}><label className={styles.check}><input type="checkbox" checked={reviewRequired} onChange={(event) => setReviewRequired(event.target.checked)} />완료 후 검수 요청</label>{reviewRequired && <label className={styles.field}>검수 기간<select value={reviewDays} onChange={(event) => setReviewDays(event.target.value)}>{Array.from({ length: 10 }, (_, index) => index + 1).map((days) => <option key={days} value={days}>{days}근무일</option>)}</select></label>}</div>
       </div>
-      {error && <p className={styles.error} role="alert">{error}</p>}
-      <div className={styles.actions}><button type="button" className={styles.cancel} disabled={pending} onClick={onClose}>취소</button><button type="submit" className={styles.submit} disabled={pending || assignees.length === 0}>{pending ? '저장 중…' : '업무 요청 저장'}</button></div>
     </form>
+    </div>
+    <div className={styles.footer}>
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      <div className={styles.actions}><button type="button" className={styles.cancel} disabled={pending} onClick={onClose}>취소</button><button type="submit" form="task-create-form" aria-label="업무 요청 저장" className={styles.submit} disabled={pending || assignees.length === 0}>{pending ? '저장 중…' : '요청하기'}</button></div>
+    </div>
   </dialog>;
 }

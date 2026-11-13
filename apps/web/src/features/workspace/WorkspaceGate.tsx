@@ -180,7 +180,7 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
 
   return (
     <div className={styles.shell}>
-      <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={user.email ?? '나'} canManageWorkspace={selected.role === 'owner'} accountControls={<>
+      <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={user.email ?? '나'} canManageWorkspace={selected.role === 'owner'} workspaceControls={
         <div className={styles.workspacePicker} ref={pickerRef}>
           <button ref={pickerButtonRef} type="button" aria-label="워크스페이스 선택" aria-expanded={pickerOpen} aria-controls="workspace-options" onClick={() => setPickerOpen((open) => !open)}>
             <span className={styles.pickerIcon} aria-hidden="true">{selected.name.charAt(0).toUpperCase()}</span>
@@ -194,8 +194,7 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
             </button>)}
           </div>}
         </div>
-        <AccountMenu auth={auth} user={user} onRefresh={onRefresh} />
-      </>} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
+      } accountControls={<AccountMenu auth={auth} user={user} onRefresh={onRefresh} />} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
         <div className={styles.managementHeading}><p className={styles.eyebrow}>WORKSPACE</p><h1>{selected.name} 관리</h1><p>멤버와 초대 현황을 확인하고 새 멤버를 초대하세요.</p></div>
         <div className={styles.managementGrid}>
           <section className={styles.managementCard} aria-labelledby="invite-title"><div className={styles.cardHeading}><h2 id="invite-title">멤버 초대</h2></div><p className={styles.helper}>이메일 주소로 초대 링크를 보냅니다. 상대방은 같은 주소로 로그인해 수락할 수 있습니다.</p>

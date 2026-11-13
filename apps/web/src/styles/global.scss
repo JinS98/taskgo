@@ -1,17 +1,20 @@
 :root {
   font-family: Inter, Pretendard, 'Noto Sans KR', system-ui, -apple-system, sans-serif;
-  color: #f5f3ff;
-  background: #1b1e31;
+  color: #202838;
+  background: #f5f6f9;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
-  --page: #1b1e31;
-  --sidebar: #20243a;
-  --accent: #a99bff;
-  --soft-text: #d3d3e5;
-  --muted: #a9abc3;
-  --line: #3d425e;
+  --page: #f5f6f9;
+  --sidebar: #fbfbfd;
+  --surface: #ffffff;
+  --accent: #5849c8;
+  --accent-soft: #f0edff;
+  --ink: #202838;
+  --soft-text: #526075;
+  --muted: #677284;
+  --line: #e4e8ef;
 }
 
 * {

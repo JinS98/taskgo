@@ -48,6 +48,8 @@ async function waitForHealth(url) {
 async function login(page, origin, email) {
   page.on('pageerror', (error) => browserErrors.push(`${email}: ${error.message}`));
   await page.goto(`${origin}/workspace`);
+  await page.getByLabel('이메일', { exact: true }).waitFor();
+  if (process.env.TASKGO_CAPTURE_UI && email === 'live-owner@example.com') await page.screenshot({ path: resolve(root, '.tmp-ui-auth.png') });
   await page.getByLabel('이메일', { exact: true }).fill(email);
   await page.getByLabel('비밀번호').fill('StrongPass123!');
   await page.getByRole('button', { name: '이메일로 로그인' }).click();
@@ -110,8 +112,20 @@ try {
   const memberPage = await (await browser.newContext()).newPage();
   await login(ownerPage, origin, owner.email);
   await login(memberPage, origin, member.email);
+  if (process.env.TASKGO_CAPTURE_UI) {
+    await ownerPage.getByRole('button', { name: '워크스페이스 관리' }).click();
+    await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-management.png') });
+    await ownerPage.getByRole('button', { name: '채팅' }).click();
+  }
   assert.equal((await db.doc(`channels/general_${workspaceId}`).get()).get('name'), '전체');
   await visibleOnce(ownerPage, 'history channel 64');
+  if (process.env.TASKGO_CAPTURE_UI) {
+    await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-chat.png') });
+    await ownerPage.setViewportSize({ width: 390, height: 844 });
+    await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-mobile.png') });
+    assert.equal(await ownerPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'Mobile layout must fit the viewport width.');
+    await ownerPage.setViewportSize({ width: 1280, height: 720 });
+  }
   assert.equal(await ownerPage.getByText('history channel 34', { exact: true }).count(), 0);
   const messageList = ownerPage.getByLabel('메시지 목록');
   await messageList.evaluate((element) => { element.scrollTop = 0; });
@@ -132,6 +146,10 @@ try {
   assert.equal((await db.collection('tasks').get()).size, 0, 'Closing the draft must not create a task.');
   await channelSource.getByRole('button', { name: '업무 요청' }).click();
   let taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
+  if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-modal.png') });
+  const dialogBounds = await taskDialog.boundingBox();
+  const submitBounds = await taskDialog.getByRole('button', { name: '업무 요청 저장' }).boundingBox();
+  assert.ok(dialogBounds && submitBounds && submitBounds.y + submitBounds.height <= dialogBounds.y + dialogBounds.height - 4, 'Task submit action must remain visible in a short dialog.');
   assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), '');
   assert.equal(await taskDialog.getByText('로컬 문장 기반 초안입니다. AI 생성 결과는 아닙니다.').count(), 0);
   await taskDialog.getByRole('button', { name: '초안 제안받기' }).click();
@@ -150,6 +168,7 @@ try {
     return new Date(nextDay.getTime() - nextDay.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   });
   await taskDialog.getByLabel('업무 제목').fill('고객 요청 정리');
+  await taskDialog.getByLabel('설명').fill('디자인 확인 항목을 정리합니다.');
   await taskDialog.getByLabel('담당자').selectOption({ label: member.email });
   await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
   await taskDialog.getByLabel('예상 작업 시간').selectOption('90');
@@ -161,11 +180,24 @@ try {
   assert.equal(channelTasks.docs[0].get('requesterId'), owner.uid);
   assert.equal(channelTasks.docs[0].get('assigneeId'), member.uid);
   assert.equal(channelTasks.docs[0].get('title'), '고객 요청 정리');
+  assert.equal(channelTasks.docs[0].get('description'), '디자인 확인 항목을 정리합니다.');
   assert.equal(channelTasks.docs[0].get('status'), 'REQUESTED');
   assert.equal(channelTasks.docs[0].get('estimatedMinutes'), 90);
   assert.equal(channelTasks.docs[0].get('reviewRequired'), false);
 
+  await ownerPage.getByRole('button', { name: '캘린더' }).click();
+  const requestedEvent = ownerPage.getByLabel('고객 요청 정리, 요청 대기');
+  await requestedEvent.waitFor();
+  assert.equal(await requestedEvent.evaluate((element) => getComputedStyle(element).borderTopStyle), 'dashed');
+  await ownerPage.getByRole('button', { name: '내 담당 업무' }).click();
+  assert.equal(await ownerPage.getByLabel('고객 요청 정리, 요청 대기').count(), 0);
+  await ownerPage.getByRole('button', { name: '팀 전체 일정' }).click();
+  await requestedEvent.waitFor();
+  if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-calendar.png') });
+  await ownerPage.getByRole('button', { name: '채팅' }).click();
+
   await memberPage.getByRole('button', { name: '업무 보드' }).click();
+  if (process.env.TASKGO_CAPTURE_UI) await memberPage.screenshot({ path: resolve(root, '.tmp-ui-board.png') });
   const memberTaskCard = memberPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
   await memberTaskCard.getByRole('button', { name: '마감 변경 제안' }).click();
   const proposedLocal = await memberPage.evaluate(() => {
@@ -183,6 +215,10 @@ try {
   await memberTaskCard.getByRole('button', { name: '수락', exact: true }).click();
   await memberTaskCard.getByText('수락됨', { exact: true }).waitFor();
   assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('status'), 'ACCEPTED');
+  await ownerPage.getByRole('button', { name: '캘린더' }).click();
+  const acceptedEvent = ownerPage.getByLabel('고객 요청 정리, 확정 업무');
+  await acceptedEvent.waitFor();
+  assert.equal(await acceptedEvent.evaluate((element) => getComputedStyle(element).borderTopStyle), 'solid');
   await ownerPage.getByRole('button', { name: '채팅' }).click();
   await memberPage.getByRole('button', { name: '채팅' }).click();
 

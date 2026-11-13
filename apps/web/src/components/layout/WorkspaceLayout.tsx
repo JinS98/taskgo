@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import {
   demoChannels,
   demoDirectMessages,
+  getConversationName,
   type DemoChannel,
   type DemoDirectMessage,
 } from '../../features/chat/demoConversations';
@@ -11,6 +12,7 @@ import styles from './WorkspaceLayout.module.scss';
 
 interface WorkspaceLayoutProps {
   children: ReactNode;
+  workspaceControls?: ReactNode;
   accountControls?: ReactNode;
   workspaceName?: string;
   canManageWorkspace?: boolean;
@@ -20,10 +22,10 @@ interface WorkspaceLayoutProps {
   conversationError?: string;
 }
 
-const viewTabs: { id: AppView; label: string }[] = [
-  { id: 'chat', label: '채팅' },
-  { id: 'board', label: '업무 보드' },
-  { id: 'calendar', label: '캘린더' },
+const viewTabs: { id: AppView; label: string; accessibleLabel: string }[] = [
+  { id: 'chat', label: 'Chat', accessibleLabel: '채팅' },
+  { id: 'board', label: 'Board', accessibleLabel: '업무 보드' },
+  { id: 'calendar', label: 'Calendar', accessibleLabel: '캘린더' },
 ];
 
 function NavigationIcon({ view }: { view: AppView }) {
@@ -36,13 +38,13 @@ function NavigationIcon({ view }: { view: AppView }) {
   return <span className={styles.navIcon}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[view]}</svg></span>;
 }
 
-export function WorkspaceLayout({ children, accountControls, workspaceName, canManageWorkspace = false, liveChat = false, channels, directMessages, conversationError }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ children, workspaceControls, accountControls, workspaceName, canManageWorkspace = false, liveChat = false, channels, directMessages, conversationError }: WorkspaceLayoutProps) {
   const mainRef = useRef<HTMLElement>(null);
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
   const setView = useWorkspaceNavigationStore((state) => state.setView);
   const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
-  const currentTitle = activeView === 'workspace' ? '워크스페이스 관리' : viewTabs.find(({ id }) => id === activeView)?.label;
+  const currentTitle = activeView === 'workspace' ? '워크스페이스 관리' : `${selectedConversation.kind === 'channel' ? '# ' : ''}${getConversationName(selectedConversation)}`;
   const visibleChannels = liveChat ? channels ?? [] : demoChannels;
   const visibleDirectMessages = liveChat ? directMessages ?? [] : demoDirectMessages;
 
@@ -66,33 +68,14 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
         </div>
 
         <div className={styles.workspaceSection}>
-          <p className={styles.sectionLabel}>워크스페이스</p>
-          <div className={styles.workspaceCard}>
+          {workspaceControls ?? <div className={styles.workspaceCard}>
             <span className={styles.workspaceIcon} aria-hidden="true">T</span>
             <div>
               <strong>{workspaceName ?? 'Taskgo 데모 팀'}</strong>
               <span>{canManageWorkspace ? '워크스페이스 장' : workspaceName ? '멤버' : '샘플 데이터'}</span>
             </div>
-          </div>
+          </div>}
         </div>
-
-        <nav className={styles.viewNavigation} aria-label="화면 전환">
-          <p className={styles.sectionLabel}>화면</p>
-          <div className={styles.viewList}>
-            {viewTabs.map(({ id, label }) => (
-              <button
-                key={id}
-                className={`${styles.navButton} ${activeView === id ? styles.active : ''}`}
-                type="button"
-                aria-pressed={activeView === id}
-                onClick={() => setView(id)}
-              >
-                <NavigationIcon view={id} /><span>{label}</span>
-              </button>
-            ))}
-          </div>
-          {canManageWorkspace && <div className={styles.manageNavigation}><p className={styles.sectionLabel}>관리</p><button className={`${styles.navButton} ${activeView === 'workspace' ? styles.active : ''}`} type="button" aria-pressed={activeView === 'workspace'} onClick={() => setView('workspace')}><NavigationIcon view="workspace" /><span>워크스페이스 관리</span></button></div>}
-        </nav>
 
         <div className={styles.conversationGroups}>
           <section aria-labelledby="channels-heading">
@@ -136,6 +119,8 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
           {conversationError && <p role="alert" className={styles.sectionLabel}>{conversationError}</p>}
         </div>
 
+        {canManageWorkspace && <button className={`${styles.manageLink} ${activeView === 'workspace' ? styles.active : ''}`} type="button" aria-pressed={activeView === 'workspace'} onClick={() => setView('workspace')}><NavigationIcon view="workspace" /><span>워크스페이스 관리</span></button>}
+
         <p className={styles.sidebarFooter}>대화가 업무가 되는 순간</p>
       </aside>
 
@@ -146,6 +131,9 @@ export function WorkspaceLayout({ children, accountControls, workspaceName, canM
             {accountControls}
           </div>
         </header>
+        <nav className={styles.viewTabs} aria-label="화면 전환">
+          {viewTabs.map(({ id, label, accessibleLabel }) => <button key={id} type="button" aria-label={accessibleLabel} aria-pressed={activeView === id} className={`${styles.viewTab} ${activeView === id ? styles.activeTab : ''}`} onClick={() => setView(id)}>{label}</button>)}
+        </nav>
         <main id="main-content" className={`${styles.main} ${activeView === 'chat' ? styles.chatMain : ''}`} ref={mainRef}>
           {children}
         </main>
