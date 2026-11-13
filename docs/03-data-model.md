@@ -21,7 +21,14 @@
 - `createTask` 호출은 `workspaceId`, `sourceMessageId`, `title`, `assigneeId`, 미래의 UTC ISO `dueDate`, `reviewRequired`를 받는다. `reviewWorkingDays`(검수 선택 시 1~10)와 `estimatedMinutes`(선택 시 15분 단위 15~480분)는 선택값이다.
 - 서버는 확인된 로그인 사용자와 담당자가 워크스페이스 멤버인지 확인한다. 원본 메시지의 워크스페이스와 채널·DM 소속을 다시 읽고, DM이면 요청자가 참여자인지 확인한다. 클라이언트가 보낸 요청자·상태 등 정의되지 않은 필드는 거부한다.
 - 서버가 `requesterId`를 로그인 UID로, `sourceType`을 원본 메시지로부터 정한다. 생성 상태는 `REQUESTED`, 검수 회차는 `0`이며 제안 마감·검수 기한·완료 사유는 null이다. 업무 문서에는 DM 본문이나 DM 룸 ID를 복사하지 않는다.
-- 팀 멤버는 업무 제목·담당·마감·상태 등 공개 메타데이터를 읽는다. `sourceMessageId`만으로 원본 DM의 읽기 권한이 생기지 않는다. 18일차에 저장된 채팅 메시지에서 수동 업무 요청 UI를 연결했다. 저장된 업무의 편집·상태 전이는 후속 일차에 구현한다.
+- 팀 멤버는 업무 제목·담당·마감·상태 등 공개 메타데이터를 읽는다. `sourceMessageId`만으로 원본 DM의 읽기 권한이 생기지 않는다. 18일차에 저장된 채팅 메시지에서 수동 업무 요청 UI를 연결했고, 20일차에 요청 수락·거절·마감 변경 제안을 연결했다.
+
+## 업무 요청 응답 (20일차)
+
+- `respondTask` 호출은 `taskId`, `action`을 받고 마감 변경 제안 시에만 미래 UTC ISO `proposedDueDate`를 추가한다. 액션은 `accept`, `decline`, `proposeDueDate`, `approveDueDate`, `rejectDueDate`다.
+- 담당자만 수락·거절·마감 변경을 제안한다. 요청자만 제안을 승인·거절한다. 모든 액션은 `REQUESTED`에서만 가능하며 트랜잭션으로 검증한다.
+- 마감 변경 제안은 `proposedDueDate`만 기록한다. 요청자 승인 시 `dueDate`로 옮기고 제안을 지운다. 거절 시 제안만 지운다. 제안이 대기 중이면 담당자 수락은 막는다. 거절은 `DECLINED`, 수락은 `ACCEPTED`로 전이한다.
+- 각 응답은 `taskEvents/{eventId}`에 `taskId`, `actorId`, `action`, `createdAt`, `metadata`를 남긴다. 클라이언트 쓰기는 계속 금지한다.
 
 ## 권한
 - 워크스페이스 장만 초대를 발송·철회·조회한다. 초대 수락은 서버 트랜잭션에서 로그인 이메일 확인 여부·초대 이메일 일치·토큰 해시·만료·사용 여부·멤버십 중복을 검증하고 멤버십·목록 미러·초대 상태를 한 번에 기록한다. 초대 기한은 7일이다.

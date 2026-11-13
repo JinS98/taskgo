@@ -13,6 +13,14 @@ export interface CreateTaskRequest {
   estimatedMinutes?: number | null;
 }
 
+export type TaskRequestAction = 'accept' | 'decline' | 'proposeDueDate' | 'approveDueDate' | 'rejectDueDate';
+
+export interface RespondToTaskRequest {
+  taskId: string;
+  action: TaskRequestAction;
+  proposedDueDate?: string;
+}
+
 export interface TaskRecord<TimestampValue> {
   workspaceId: string;
   sourceMessageId: string;

@@ -30,7 +30,7 @@ async function account(name, verified = true) {
   connectFirestoreEmulator(db, '127.0.0.1', firestorePort);
   const functions = getFunctions(app, 'asia-northeast3');
   connectFunctionsEmulator(functions, '127.0.0.1', functionsPort);
-  return { user, db, create: (data) => httpsCallable(functions, 'createTask')(data), suggest: (data) => httpsCallable(functions, 'suggestTask')(data) };
+  return { user, db, create: (data) => httpsCallable(functions, 'createTask')(data), suggest: (data) => httpsCallable(functions, 'suggestTask')(data), respond: (data) => httpsCallable(functions, 'respondTask')(data) };
 }
 
 async function rejected(promise, code) {
@@ -174,7 +174,46 @@ try {
   await assert.rejects(openAiTaskCandidates(sampleContext, 'test-key', 'gpt-4.1-mini', async () => new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ candidates: [sampleCandidates[0], sampleCandidates[0]] }) }] }] }), { status: 200 })));
   await assert.rejects(openAiTaskCandidates(sampleContext, 'test-key', 'gpt-4.1-mini', async () => new Response('rate limited', { status: 429 })));
 
-  console.log('PASS: task schema, permissions, scoped suggestions, OpenAI request/response contract, and member-only reads.');
+  const channelResponse = { taskId: channelTaskId, action: 'accept' };
+  await rejected(owner.respond(channelResponse), 'permission-denied');
+  await rejected(outsider.respond(channelResponse), 'permission-denied');
+  await rejected(unverified.respond(channelResponse), 'permission-denied');
+  await rejected(assignee.respond({ ...channelResponse, status: 'DONE' }), 'invalid-argument');
+  await rejected(assignee.respond({ taskId: channelTaskId, action: 'proposeDueDate', proposedDueDate: 'tomorrow' }), 'invalid-argument');
+  const laterDue = new Date(Date.now() + 2 * 86400000).toISOString();
+  await assignee.respond({ taskId: channelTaskId, action: 'proposeDueDate', proposedDueDate: laterDue });
+  let proposedTask = await adminDb.doc(`tasks/${channelTaskId}`).get();
+  assert.equal(proposedTask.get('status'), 'REQUESTED');
+  assert.equal(proposedTask.get('dueDate').toDate().toISOString(), dueDate, 'A proposed date must not replace the confirmed date.');
+  assert.equal(proposedTask.get('proposedDueDate').toDate().toISOString(), laterDue);
+  await rejected(assignee.respond(channelResponse), 'failed-precondition');
+  await rejected(member.respond({ taskId: channelTaskId, action: 'approveDueDate' }), 'permission-denied');
+  await owner.respond({ taskId: channelTaskId, action: 'approveDueDate' });
+  proposedTask = await adminDb.doc(`tasks/${channelTaskId}`).get();
+  assert.equal(proposedTask.get('dueDate').toDate().toISOString(), laterDue);
+  assert.equal(proposedTask.get('proposedDueDate'), null);
+  const concurrent = await Promise.allSettled([assignee.respond(channelResponse), assignee.respond(channelResponse)]);
+  assert.equal(concurrent.filter((result) => result.status === 'fulfilled').length, 1);
+  assert.equal(concurrent.filter((result) => result.status === 'rejected' && result.reason.code === 'functions/failed-precondition').length, 1);
+  assert.equal((await adminDb.doc(`tasks/${channelTaskId}`).get()).get('status'), 'ACCEPTED');
+  await rejected(assignee.respond({ taskId: channelTaskId, action: 'decline' }), 'failed-precondition');
+
+  await assignee.respond({ taskId: dmTaskId, action: 'proposeDueDate', proposedDueDate: laterDue });
+  await rejected(assignee.respond({ taskId: dmTaskId, action: 'rejectDueDate' }), 'permission-denied');
+  await member.respond({ taskId: dmTaskId, action: 'rejectDueDate' });
+  assert.equal((await adminDb.doc(`tasks/${dmTaskId}`).get()).get('proposedDueDate'), null);
+  await assignee.respond({ taskId: dmTaskId, action: 'decline' });
+  assert.equal((await adminDb.doc(`tasks/${dmTaskId}`).get()).get('status'), 'DECLINED');
+  const staleTaskId = (await owner.create({ ...input, title: '마감이 지난 요청 복구' })).data.taskId;
+  await adminDb.doc(`tasks/${staleTaskId}`).update({ dueDate: Timestamp.fromMillis(Date.now() - 60000) });
+  await rejected(assignee.respond({ taskId: staleTaskId, action: 'accept' }), 'failed-precondition');
+  await assignee.respond({ taskId: staleTaskId, action: 'proposeDueDate', proposedDueDate: laterDue });
+  await owner.respond({ taskId: staleTaskId, action: 'approveDueDate' });
+  await assignee.respond({ taskId: staleTaskId, action: 'accept' });
+  assert.equal((await adminDb.doc(`tasks/${staleTaskId}`).get()).get('status'), 'ACCEPTED');
+  assert.equal((await adminDb.collection('taskEvents').get()).size, 9);
+
+  console.log('PASS: task schema, permissions, scoped suggestions, OpenAI contract, and request response transitions.');
 } finally {
   for (const app of apps) await deleteApp(app);
   await deleteAdminApp(admin);

@@ -165,6 +165,27 @@ try {
   assert.equal(channelTasks.docs[0].get('estimatedMinutes'), 90);
   assert.equal(channelTasks.docs[0].get('reviewRequired'), false);
 
+  await memberPage.getByRole('button', { name: '업무 보드' }).click();
+  const memberTaskCard = memberPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
+  await memberTaskCard.getByRole('button', { name: '마감 변경 제안' }).click();
+  const proposedLocal = await memberPage.evaluate(() => {
+    const nextDate = new Date(Date.now() + 2 * 86400000);
+    return new Date(nextDate.getTime() - nextDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  });
+  await memberTaskCard.getByLabel('새 마감 날짜·시간').fill(proposedLocal);
+  await memberTaskCard.getByRole('button', { name: '제안 보내기' }).click();
+  await memberTaskCard.getByText('제안된 마감').waitFor();
+  assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('dueDate').toDate().toISOString(), channelTasks.docs[0].get('dueDate').toDate().toISOString(), 'Proposing must preserve the original due date.');
+  await ownerPage.getByRole('button', { name: '업무 보드' }).click();
+  const ownerTaskCard = ownerPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
+  await ownerTaskCard.getByRole('button', { name: '변경 승인' }).click();
+  await ownerTaskCard.getByText('제안된 마감').waitFor({ state: 'hidden' });
+  await memberTaskCard.getByRole('button', { name: '수락', exact: true }).click();
+  await memberTaskCard.getByText('수락됨', { exact: true }).waitFor();
+  assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('status'), 'ACCEPTED');
+  await ownerPage.getByRole('button', { name: '채팅' }).click();
+  await memberPage.getByRole('button', { name: '채팅' }).click();
+
   await send(ownerPage, 'owner channel message');
   await visibleOnce(ownerPage, 'owner channel message');
   await visibleOnce(memberPage, 'owner channel message');
@@ -223,6 +244,12 @@ try {
   assert.equal(dmTask.get('reviewRequired'), true);
   assert.equal(dmTask.get('reviewWorkingDays'), 2);
   assert.equal('content' in dmTask.data(), false);
+  await memberPage.getByRole('button', { name: '업무 보드' }).click();
+  const dmTaskCard = memberPage.getByRole('article').filter({ hasText: '비공개 대화 후속 업무' });
+  await dmTaskCard.getByRole('button', { name: '거절', exact: true }).click();
+  await dmTaskCard.getByText('거절됨', { exact: true }).waitFor();
+  assert.equal((await db.doc(`tasks/${dmTask.id}`).get()).get('status'), 'DECLINED');
+  await memberPage.getByRole('button', { name: '채팅' }).click();
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await memberPage.getByText('실시간 연결됨').waitFor();
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('typing in DM');
@@ -244,7 +271,7 @@ try {
   await visibleOnce(ownerPage, 'offline gap 34');
   assert.ok((await db.collection('messages').get()).size >= 70);
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions verified explicit local suggestions, editable channel/DM tasks, typing, history, offline recovery, and live messages.');
+  console.log('PASS: two Chrome sessions verified task creation, due proposal approval, acceptance, decline, typing, history, and live messages.');
 } finally {
   await browser?.close();
   await vite?.close();

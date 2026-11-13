@@ -7,6 +7,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 import nodemailer from 'nodemailer';
 import { createTaskRecord } from './taskModel.js';
+import { respondToTaskRequest } from './taskResponses.js';
 import { localTaskCandidates, openAiTaskCandidates, suggestTaskFromMessage } from './taskSuggestions.js';
 
 initializeApp();
@@ -19,6 +20,11 @@ const inviteLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 export const createTask = onCall({ region }, async (request) => {
   const user = await verifiedUser(request);
   return createTaskRecord(db, user.uid, request.data);
+});
+
+export const respondTask = onCall({ region }, async (request) => {
+  const user = await verifiedUser(request);
+  return respondToTaskRequest(db, user.uid, request.data);
 });
 
 export const suggestTask = onCall({ region, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {
