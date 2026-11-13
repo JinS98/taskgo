@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import type { Auth } from 'firebase/auth';
 import { collection, onSnapshot, query, Timestamp, where, type Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
-import type { TaskRecord, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
+import type { TaskEventRecord, TaskRecord, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
 import { respondTask, taskResponseError } from './taskResponseApi';
 import styles from './TaskBoardPanel.module.scss';
 
 type BoardTask = TaskRecord<Timestamp> & { id: string };
+type BoardEvent = TaskEventRecord<Timestamp> & { id: string };
 type Filter = 'all' | 'requested' | 'active' | 'finished';
 const filters: { id: Filter; label: string }[] = [
   { id: 'all', label: '전체' }, { id: 'requested', label: '요청 대기' },
@@ -15,6 +16,10 @@ const filters: { id: Filter; label: string }[] = [
 const statusLabels: Record<TaskStatus, string> = {
   REQUESTED: '요청 대기', ACCEPTED: '수락됨', IN_PROGRESS: '진행 중',
   REVIEW_PENDING: '검수 대기', REWORK: '재작업', DECLINED: '거절됨', DONE: '완료',
+};
+const eventLabels: Record<TaskRequestAction, string> = {
+  accept: '업무 요청 수락', decline: '업무 요청 거절', startProgress: '업무 진행 시작',
+  proposeDueDate: '마감 변경 제안', approveDueDate: '마감 변경 승인', rejectDueDate: '마감 변경 거절',
 };
 
 function formatDate(value: Timestamp | null): string {
@@ -25,17 +30,44 @@ function localDateTime(date: Date): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-function TaskCard({ task, auth, functions, viewerId, memberEmails, onNotice }: {
-  task: BoardTask; auth: Auth; functions: Functions; viewerId: string;
+function TaskHistory({ db, task, memberEmails }: { db: Firestore; task: BoardTask; memberEmails: Record<string, string> }) {
+  const [state, setState] = useState<{ events: BoardEvent[]; error: string } | null>(null);
+
+  useEffect(() => onSnapshot(query(collection(db, 'taskEvents'), where('taskId', '==', task.id)), (snapshot) => {
+    const events = snapshot.docs.map((item) => ({ ...item.data() as TaskEventRecord<Timestamp>, id: item.id }));
+    events.sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis() || a.id.localeCompare(b.id));
+    setState({ events, error: '' });
+  }, () => setState({ events: [], error: '업무 이력을 불러오지 못했습니다.' })), [db, task.id]);
+
+  return <div className={styles.history}>
+    <strong>업무 이력</strong>
+    {state === null && <p role="status">이력을 불러오는 중…</p>}
+    {state?.error && <p role="alert">{state.error}</p>}
+    {state && !state.error && <ol>
+      <li><span>업무 요청 생성</span><small>{memberEmails[task.requesterId] ?? '요청자'} · {formatDate(task.createdAt)}</small></li>
+      {state.events.map((event) => <li key={event.id}>
+        <span>{eventLabels[event.action] ?? event.action}</span>
+        <small>{memberEmails[event.actorId] ?? '멤버'} · {formatDate(event.createdAt)}</small>
+        {event.action === 'proposeDueDate' && event.metadata.proposedDueDate && <small>제안 {formatDate(Timestamp.fromDate(new Date(event.metadata.proposedDueDate)))}</small>}
+        {event.action === 'approveDueDate' && event.metadata.dueDate && <small>확정 {formatDate(Timestamp.fromDate(new Date(event.metadata.dueDate)))}</small>}
+      </li>)}
+    </ol>}
+  </div>;
+}
+
+function TaskCard({ task, auth, db, functions, viewerId, memberEmails, onNotice }: {
+  task: BoardTask; auth: Auth; db: Firestore; functions: Functions; viewerId: string;
   memberEmails: Record<string, string>; onNotice: (message: string) => void;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [dueLocal, setDueLocal] = useState('');
   const [showProposal, setShowProposal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const isAssignee = task.assigneeId === viewerId;
   const isRequester = task.requesterId === viewerId;
   const requested = task.status === 'REQUESTED';
+  const negotiable = requested || task.status === 'ACCEPTED' || task.status === 'IN_PROGRESS';
 
   async function act(action: TaskRequestAction, proposedDueDate?: string) {
     if (pending) return;
@@ -45,7 +77,7 @@ function TaskCard({ task, auth, functions, viewerId, memberEmails, onNotice }: {
       await respondTask(auth, functions, { taskId: task.id, action, ...(proposedDueDate ? { proposedDueDate } : {}) });
       setShowProposal(false);
       setDueLocal('');
-      onNotice({ accept: '업무 요청을 수락했습니다.', decline: '업무 요청을 거절했습니다.', proposeDueDate: '마감 변경을 제안했습니다.', approveDueDate: '제안한 마감일을 승인했습니다.', rejectDueDate: '마감 변경 제안을 거절했습니다.' }[action]);
+      onNotice({ accept: '업무 요청을 수락했습니다.', decline: '업무 요청을 거절했습니다.', startProgress: '업무 진행을 시작했습니다.', proposeDueDate: '마감 변경을 제안했습니다.', approveDueDate: '제안한 마감일을 승인했습니다.', rejectDueDate: '마감 변경 제안을 거절했습니다.' }[action]);
     } catch (cause) {
       setError(taskResponseError(cause));
     } finally {
@@ -65,20 +97,23 @@ function TaskCard({ task, auth, functions, viewerId, memberEmails, onNotice }: {
     {task.description && <p className={styles.description}>{task.description}</p>}
     <div className={styles.meta}><span>요청 {memberEmails[task.requesterId] ?? '멤버'}</span><span>담당 {memberEmails[task.assigneeId] ?? '멤버'}</span>{task.estimatedMinutes && <span>예상 {task.estimatedMinutes}분</span>}{task.reviewRequired && <span>검수 필요</span>}</div>
     {task.proposedDueDate && <div className={styles.proposal}><strong>제안된 마감</strong><span>{formatDate(task.proposedDueDate)}</span><small>요청자가 승인하기 전까지 기존 마감일이 유지됩니다.</small></div>}
-    {requested && isAssignee && !task.proposedDueDate && <div className={styles.actions}>
-      <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('accept')}>수락</button>
-      <button type="button" disabled={pending} onClick={() => setShowProposal((value) => !value)}>마감 변경 제안</button>
-      <button type="button" className={styles.danger} disabled={pending} onClick={() => void act('decline')}>거절</button>
+    {isAssignee && negotiable && <div className={styles.actions}>
+      {requested && !task.proposedDueDate && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('accept')}>수락</button>}
+      {task.status === 'ACCEPTED' && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('startProgress')}>진행 시작</button>}
+      {!task.proposedDueDate && <button type="button" disabled={pending} onClick={() => setShowProposal((value) => !value)}>마감 변경 제안</button>}
+      {requested && <button type="button" className={styles.danger} disabled={pending} onClick={() => void act('decline')}>{task.proposedDueDate ? '요청 거절' : '거절'}</button>}
+      {task.proposedDueDate && <span className={styles.waiting}>요청자의 마감 변경 응답을 기다리는 중</span>}
     </div>}
-    {requested && isAssignee && task.proposedDueDate && <div className={styles.actions}><button type="button" className={styles.danger} disabled={pending} onClick={() => void act('decline')}>요청 거절</button><span className={styles.waiting}>요청자의 마감 변경 응답을 기다리는 중</span></div>}
-    {requested && isRequester && task.proposedDueDate && <div className={styles.actions}>
+    {negotiable && isRequester && task.proposedDueDate && <div className={styles.actions}>
       <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('approveDueDate')}>변경 승인</button>
       <button type="button" disabled={pending} onClick={() => void act('rejectDueDate')}>변경 거절</button>
     </div>}
-    {showProposal && requested && isAssignee && !task.proposedDueDate && <div className={styles.proposeForm}>
+    {showProposal && negotiable && isAssignee && !task.proposedDueDate && <div className={styles.proposeForm}>
       <label>새 마감 날짜·시간<input type="datetime-local" value={dueLocal} min={localDateTime(new Date())} onChange={(event) => setDueLocal(event.target.value)} /></label>
       <button type="button" className={styles.primary} disabled={pending || !dueLocal} onClick={propose}>제안 보내기</button>
     </div>}
+    <button type="button" className={styles.historyToggle} aria-expanded={showHistory} onClick={() => setShowHistory((value) => !value)}>{showHistory ? '이력 닫기' : '이력 보기'}</button>
+    {showHistory && <TaskHistory db={db} task={task} memberEmails={memberEmails} />}
     {error && <p className={styles.error} role="alert">{error}</p>}
   </article>;
 }
@@ -111,6 +146,6 @@ export function TaskBoardPanel({ auth, db, functions, workspaceId, viewerId, mem
     <div className={styles.filters} aria-label="업무 상태 필터">{filters.map((item) => <button key={item.id} type="button" aria-pressed={filter === item.id} className={filter === item.id ? styles.selected : ''} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
-    {loading ? <p className={styles.empty}>업무를 불러오는 중…</p> : tasks.length === 0 ? <p className={styles.empty}>아직 업무 요청이 없습니다. 채팅 메시지에서 업무를 만들어 보세요.</p> : <div className={styles.columns}>{visibleColumns.map((column) => <section className={styles.column} key={column.id} aria-label={column.label}><div className={styles.columnHeading}><h2>{column.label}</h2><span>{column.tasks.length}</span></div>{column.tasks.length ? column.tasks.map((task) => <TaskCard key={task.id} task={task} auth={auth} functions={functions} viewerId={viewerId} memberEmails={memberEmails} onNotice={setNotice} />) : <p className={styles.columnEmpty}>이 상태의 업무가 없습니다.</p>}</section>)}</div>}
+    {loading ? <p className={styles.empty}>업무를 불러오는 중…</p> : tasks.length === 0 ? <p className={styles.empty}>아직 업무 요청이 없습니다. 채팅 메시지에서 업무를 만들어 보세요.</p> : <div className={styles.columns}>{visibleColumns.map((column) => <section className={styles.column} key={column.id} aria-label={column.label}><div className={styles.columnHeading}><h2>{column.label}</h2><span>{column.tasks.length}</span></div>{column.tasks.length ? column.tasks.map((task) => <TaskCard key={task.id} task={task} auth={auth} db={db} functions={functions} viewerId={viewerId} memberEmails={memberEmails} onNotice={setNotice} />) : <p className={styles.columnEmpty}>이 상태의 업무가 없습니다.</p>}</section>)}</div>}
   </section>;
 }

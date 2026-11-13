@@ -25,10 +25,16 @@
 
 ## 업무 요청 응답 (20일차)
 
-- `respondTask` 호출은 `taskId`, `action`을 받고 마감 변경 제안 시에만 미래 UTC ISO `proposedDueDate`를 추가한다. 액션은 `accept`, `decline`, `proposeDueDate`, `approveDueDate`, `rejectDueDate`다.
-- 담당자만 수락·거절·마감 변경을 제안한다. 요청자만 제안을 승인·거절한다. 모든 액션은 `REQUESTED`에서만 가능하며 트랜잭션으로 검증한다.
+- `respondTask` 호출은 `taskId`, `action`을 받고 마감 변경 제안 시에만 미래 UTC ISO `proposedDueDate`를 추가한다. 액션은 `accept`, `decline`, `startProgress`, `proposeDueDate`, `approveDueDate`, `rejectDueDate`다.
+- 담당자만 수락·거절·진행 시작·마감 변경을 제안한다. 요청자만 제안을 승인·거절한다. 수락·거절은 `REQUESTED`에서만 가능하며 모든 액션의 상태와 권한을 트랜잭션으로 검증한다.
 - 마감 변경 제안은 `proposedDueDate`만 기록한다. 요청자 승인 시 `dueDate`로 옮기고 제안을 지운다. 거절 시 제안만 지운다. 제안이 대기 중이면 담당자 수락은 막는다. 거절은 `DECLINED`, 수락은 `ACCEPTED`로 전이한다.
 - 각 응답은 `taskEvents/{eventId}`에 `taskId`, `actorId`, `action`, `createdAt`, `metadata`를 남긴다. 클라이언트 쓰기는 계속 금지한다.
+
+## 진행·마감 협의 (21일차)
+
+- 담당자만 `ACCEPTED` 업무에 `startProgress`를 호출해 `IN_PROGRESS`로 전이한다. 중복 호출이나 다른 상태에서의 호출은 거부한다.
+- 담당자는 `REQUESTED`·`ACCEPTED`·`IN_PROGRESS` 상태에서 새 마감을 제안할 수 있다. 요청자만 승인·거절한다. 승인 전에는 `dueDate`와 상태를 보존하고 제안일을 `proposedDueDate`에 둔다. 승인 후에도 상태는 그대로 유지한다.
+- 제안·승인·거절과 진행 시작은 서버 트랜잭션으로 기록한다. 제안 이력에는 기존·제안 마감, 승인 이력에는 기존·확정 마감을 남긴다. 업무별 이력 조회는 워크스페이스 멤버에게만 허용하고, UI는 기존 업무를 위해 `createdAt`을 요청 생성 이력으로 함께 표시한다.
 
 ## 권한
 - 워크스페이스 장만 초대를 발송·철회·조회한다. 초대 수락은 서버 트랜잭션에서 로그인 이메일 확인 여부·초대 이메일 일치·토큰 해시·만료·사용 여부·멤버십 중복을 검증하고 멤버십·목록 미러·초대 상태를 한 번에 기록한다. 초대 기한은 7일이다.

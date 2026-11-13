@@ -36,6 +36,17 @@
 .proposeForm { display:flex; align-items:end; flex-wrap:wrap; gap:8px; margin-top:11px; }
 .proposeForm label { display:grid; gap:6px; color:#526075; font-size:10px; font-weight:700; }
 .proposeForm input { min-height:34px; max-width:100%; padding:6px 8px; border:1px solid #dbe0e9; border-radius:7px; background:#fff; color:var(--ink); font:inherit; font-size:11px; }
+.historyToggle { margin-top:12px; padding:5px 0; border:0; background:transparent; color:var(--accent); cursor:pointer; font:inherit; font-size:10px; font-weight:750; }
+.historyToggle:hover { text-decoration:underline; text-underline-offset:3px; }
+.historyToggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.history { margin-top:8px; padding:11px; border:1px solid #e7e9f0; border-radius:8px; background:#fafbfe; }
+.history > strong { color:#465267; font-size:11px; }
+.history > p { margin:9px 0 0; color:#8c97a5; font-size:10px; }
+.history ol { display:grid; gap:10px; margin:11px 0 0; padding:0 0 0 15px; color:#b6aee8; }
+.history li { padding-left:2px; }
+.history li span,.history li small { display:block; overflow-wrap:anywhere; }
+.history li span { color:#465267; font-size:10px; font-weight:700; }
+.history li small { margin-top:3px; color:#8893a3; font-size:10px; line-height:1.4; }
 .notice,.error,.empty { margin:16px 0 0; padding:12px 14px; border-radius:8px; font-size:12px; line-height:1.5; }
 .notice { border:1px solid #cfe8de; background:#ecf8f3; color:#176b59; }
 .error { border:1px solid #f1d5db; background:#fff2f4; color:#9c3e50; }

@@ -3,7 +3,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import type { RespondToTaskRequest, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
-const actions = new Set<TaskRequestAction>(['accept', 'decline', 'proposeDueDate', 'approveDueDate', 'rejectDueDate']);
+const actions = new Set<TaskRequestAction>(['accept', 'decline', 'startProgress', 'proposeDueDate', 'approveDueDate', 'rejectDueDate']);
 
 function parseFutureDate(value: unknown): Timestamp {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
@@ -51,11 +51,21 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
     const assigneeId = task.get('assigneeId');
     const actorIsAssignee = assigneeId === actorId;
     const actorIsRequester = requesterId === actorId;
-    const assigneeAction = input.action === 'accept' || input.action === 'decline' || input.action === 'proposeDueDate';
+    const assigneeAction = input.action === 'accept' || input.action === 'decline' || input.action === 'startProgress' || input.action === 'proposeDueDate';
     if (assigneeAction ? !actorIsAssignee : !actorIsRequester) {
       throw new HttpsError('permission-denied', assigneeAction ? '담당자만 요청에 응답할 수 있습니다.' : '요청자만 마감 변경 제안에 응답할 수 있습니다.');
     }
-    if (task.get('status') !== 'REQUESTED') throw new HttpsError('failed-precondition', '대기 중인 업무 요청만 처리할 수 있습니다.');
+    const currentStatus = task.get('status') as TaskStatus;
+    if ((input.action === 'accept' || input.action === 'decline') && currentStatus !== 'REQUESTED') {
+      throw new HttpsError('failed-precondition', '대기 중인 업무 요청만 수락하거나 거절할 수 있습니다.');
+    }
+    if (input.action === 'startProgress' && currentStatus !== 'ACCEPTED') {
+      throw new HttpsError('failed-precondition', '수락된 업무만 진행을 시작할 수 있습니다.');
+    }
+    if ((input.action === 'proposeDueDate' || input.action === 'approveDueDate' || input.action === 'rejectDueDate')
+      && currentStatus !== 'REQUESTED' && currentStatus !== 'ACCEPTED' && currentStatus !== 'IN_PROGRESS') {
+      throw new HttpsError('failed-precondition', '요청·수락·진행 중인 업무에서만 마감을 협의할 수 있습니다.');
+    }
     const currentDue = task.get('dueDate');
     const pendingDue = task.get('proposedDueDate');
     if (!(currentDue instanceof Timestamp) || (pendingDue !== null && !(pendingDue instanceof Timestamp))) {
@@ -79,21 +89,29 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
 
     const now = Timestamp.now();
     const updates: { updatedAt: Timestamp; status?: TaskStatus; proposedDueDate?: Timestamp | null; dueDate?: Timestamp } = { updatedAt: now };
-    let status: TaskStatus = 'REQUESTED';
+    let status: TaskStatus = currentStatus;
     let due = currentDue;
     let proposed: Timestamp | null = pendingDue;
     if (input.action === 'accept') { status = 'ACCEPTED'; updates.status = status; }
     if (input.action === 'decline') { status = 'DECLINED'; updates.status = status; updates.proposedDueDate = null; proposed = null; }
+    if (input.action === 'startProgress') { status = 'IN_PROGRESS'; updates.status = status; }
     if (input.action === 'proposeDueDate') { updates.proposedDueDate = input.proposedDue; proposed = input.proposedDue; }
     if (input.action === 'approveDueDate') { updates.dueDate = pendingDue; updates.proposedDueDate = null; due = pendingDue!; proposed = null; }
     if (input.action === 'rejectDueDate') { updates.proposedDueDate = null; proposed = null; }
     transaction.update(taskRef, updates);
+    const metadata = input.action === 'proposeDueDate'
+      ? { previousDueDate: currentDue.toDate().toISOString(), proposedDueDate: input.proposedDue!.toDate().toISOString() }
+      : input.action === 'approveDueDate'
+        ? { previousDueDate: currentDue.toDate().toISOString(), dueDate: pendingDue!.toDate().toISOString() }
+        : input.action === 'rejectDueDate'
+          ? { proposedDueDate: pendingDue!.toDate().toISOString() }
+          : {};
     transaction.create(eventRef, {
       taskId: input.taskId,
       actorId,
       action: input.action,
       createdAt: now,
-      metadata: input.action === 'proposeDueDate' ? { proposedDueDate: input.proposedDue!.toDate().toISOString() } : {},
+      metadata,
     });
     return { taskId: input.taskId, status, dueDate: due.toDate().toISOString(), proposedDueDate: proposed?.toDate().toISOString() ?? null };
   });

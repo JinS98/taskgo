@@ -4,7 +4,7 @@ import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { connectFirestoreEmulator, doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
+import { collection, connectFirestoreEmulator, doc, getDoc, getDocs, getFirestore, query, setDoc, where } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { openAiTaskCandidates, suggestTaskFromMessage } from '../lib/taskSuggestions.js';
 
@@ -200,6 +200,36 @@ try {
   assert.equal(concurrent.filter((result) => result.status === 'rejected' && result.reason.code === 'functions/failed-precondition').length, 1);
   assert.equal((await adminDb.doc(`tasks/${channelTaskId}`).get()).get('status'), 'ACCEPTED');
   await rejected(assignee.respond({ taskId: channelTaskId, action: 'decline' }), 'failed-precondition');
+  await rejected(owner.respond({ taskId: channelTaskId, action: 'startProgress' }), 'permission-denied');
+  await rejected(assignee.respond({ taskId: channelTaskId, action: 'startProgress', proposedDueDate: laterDue }), 'invalid-argument');
+  const starts = await Promise.allSettled([
+    assignee.respond({ taskId: channelTaskId, action: 'startProgress' }),
+    assignee.respond({ taskId: channelTaskId, action: 'startProgress' }),
+  ]);
+  assert.equal(starts.filter((result) => result.status === 'fulfilled').length, 1);
+  assert.equal(starts.filter((result) => result.status === 'rejected' && result.reason.code === 'functions/failed-precondition').length, 1);
+  assert.equal((await adminDb.doc(`tasks/${channelTaskId}`).get()).get('status'), 'IN_PROGRESS');
+  const progressDue = new Date(Date.now() + 3 * 86400000).toISOString();
+  await assignee.respond({ taskId: channelTaskId, action: 'proposeDueDate', proposedDueDate: progressDue });
+  await rejected(assignee.respond({ taskId: channelTaskId, action: 'approveDueDate' }), 'permission-denied');
+  await owner.respond({ taskId: channelTaskId, action: 'rejectDueDate' });
+  let inProgressTask = await adminDb.doc(`tasks/${channelTaskId}`).get();
+  assert.equal(inProgressTask.get('status'), 'IN_PROGRESS');
+  assert.equal(inProgressTask.get('dueDate').toDate().toISOString(), laterDue);
+  assert.equal(inProgressTask.get('proposedDueDate'), null);
+  await assignee.respond({ taskId: channelTaskId, action: 'proposeDueDate', proposedDueDate: progressDue });
+  inProgressTask = await adminDb.doc(`tasks/${channelTaskId}`).get();
+  assert.equal(inProgressTask.get('dueDate').toDate().toISOString(), laterDue);
+  await owner.respond({ taskId: channelTaskId, action: 'approveDueDate' });
+  inProgressTask = await adminDb.doc(`tasks/${channelTaskId}`).get();
+  assert.equal(inProgressTask.get('status'), 'IN_PROGRESS', 'Deadline approval must preserve progress status.');
+  assert.equal(inProgressTask.get('dueDate').toDate().toISOString(), progressDue);
+  assert.equal(inProgressTask.get('proposedDueDate'), null);
+  const history = await getDocs(query(collection(owner.db, 'taskEvents'), where('taskId', '==', channelTaskId)));
+  assert.equal(history.size, 8);
+  assert.equal(history.docs.filter((event) => event.get('action') === 'startProgress').length, 1);
+  assert.equal(history.docs.find((event) => event.get('action') === 'approveDueDate' && event.get('metadata.dueDate') === progressDue)?.get('metadata.previousDueDate'), laterDue);
+  await assert.rejects(getDocs(query(collection(outsider.db, 'taskEvents'), where('taskId', '==', channelTaskId))), (error) => error.code === 'permission-denied');
 
   await assignee.respond({ taskId: dmTaskId, action: 'proposeDueDate', proposedDueDate: laterDue });
   await rejected(assignee.respond({ taskId: dmTaskId, action: 'rejectDueDate' }), 'permission-denied');
@@ -214,9 +244,14 @@ try {
   await owner.respond({ taskId: staleTaskId, action: 'approveDueDate' });
   await assignee.respond({ taskId: staleTaskId, action: 'accept' });
   assert.equal((await adminDb.doc(`tasks/${staleTaskId}`).get()).get('status'), 'ACCEPTED');
-  assert.equal((await adminDb.collection('taskEvents').get()).size, 9);
+  await assignee.respond({ taskId: staleTaskId, action: 'proposeDueDate', proposedDueDate: progressDue });
+  await owner.respond({ taskId: staleTaskId, action: 'approveDueDate' });
+  const acceptedTask = await adminDb.doc(`tasks/${staleTaskId}`).get();
+  assert.equal(acceptedTask.get('status'), 'ACCEPTED');
+  assert.equal(acceptedTask.get('dueDate').toDate().toISOString(), progressDue);
+  assert.equal((await adminDb.collection('taskEvents').get()).size, 16);
 
-  console.log('PASS: task schema, permissions, scoped suggestions, OpenAI contract, and request response transitions.');
+  console.log('PASS: task schema, permissions, scoped suggestions, OpenAI contract, request and progress transitions, deadline approvals, and history.');
 } finally {
   for (const app of apps) await deleteApp(app);
   await deleteAdminApp(admin);

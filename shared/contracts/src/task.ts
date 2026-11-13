@@ -14,12 +14,24 @@ export interface CreateTaskRequest {
   estimatedMinutes?: number | null;
 }
 
-export type TaskRequestAction = 'accept' | 'decline' | 'proposeDueDate' | 'approveDueDate' | 'rejectDueDate';
+export type TaskRequestAction = 'accept' | 'decline' | 'startProgress' | 'proposeDueDate' | 'approveDueDate' | 'rejectDueDate';
 
 export interface RespondToTaskRequest {
   taskId: string;
   action: TaskRequestAction;
   proposedDueDate?: string;
+}
+
+export interface TaskEventRecord<TimestampValue> {
+  taskId: string;
+  actorId: string;
+  action: TaskRequestAction;
+  createdAt: TimestampValue;
+  metadata: {
+    previousDueDate?: string;
+    proposedDueDate?: string;
+    dueDate?: string;
+  };
 }
 
 export interface TaskRecord<TimestampValue> {

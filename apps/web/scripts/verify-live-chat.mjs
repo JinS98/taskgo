@@ -215,6 +215,25 @@ try {
   await memberTaskCard.getByRole('button', { name: '수락', exact: true }).click();
   await memberTaskCard.getByText('수락됨', { exact: true }).waitFor();
   assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('status'), 'ACCEPTED');
+  await memberTaskCard.getByRole('button', { name: '진행 시작' }).click();
+  await memberTaskCard.getByText('진행 중', { exact: true }).waitFor();
+  await memberTaskCard.getByRole('button', { name: '마감 변경 제안' }).click();
+  const progressLocal = await memberPage.evaluate(() => {
+    const nextDate = new Date(Date.now() + 3 * 86400000);
+    return new Date(nextDate.getTime() - nextDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  });
+  await memberTaskCard.getByLabel('새 마감 날짜·시간').fill(progressLocal);
+  await memberTaskCard.getByRole('button', { name: '제안 보내기' }).click();
+  await memberTaskCard.getByText('제안된 마감').waitFor();
+  assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('dueDate').toDate().toISOString(), new Date(proposedLocal).toISOString(), 'In-progress proposal must preserve the confirmed date.');
+  await ownerTaskCard.getByRole('button', { name: '변경 승인' }).click();
+  await ownerTaskCard.getByText('제안된 마감').waitFor({ state: 'hidden' });
+  assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('status'), 'IN_PROGRESS');
+  assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('dueDate').toDate().toISOString(), new Date(progressLocal).toISOString());
+  await memberTaskCard.getByRole('button', { name: '이력 보기' }).click();
+  await memberTaskCard.getByText('업무 요청 생성', { exact: true }).waitFor();
+  await memberTaskCard.getByText('업무 진행 시작', { exact: true }).waitFor();
+  assert.equal(await memberTaskCard.getByText('마감 변경 승인', { exact: true }).count(), 2);
   await ownerPage.getByRole('button', { name: '캘린더' }).click();
   const acceptedEvent = ownerPage.getByLabel('고객 요청 정리, 확정 업무');
   await acceptedEvent.waitFor();
@@ -307,7 +326,7 @@ try {
   await visibleOnce(ownerPage, 'offline gap 34');
   assert.ok((await db.collection('messages').get()).size >= 70);
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions verified task creation, due proposal approval, acceptance, decline, typing, history, and live messages.');
+  console.log('PASS: two Chrome sessions verified task creation, acceptance, progress, deadline negotiation, history, decline, typing, and live messages.');
 } finally {
   await browser?.close();
   await vite?.close();
