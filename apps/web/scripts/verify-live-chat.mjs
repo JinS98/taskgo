@@ -132,6 +132,13 @@ try {
   assert.equal((await db.collection('tasks').get()).size, 0, 'Closing the draft must not create a task.');
   await channelSource.getByRole('button', { name: '업무 요청' }).click();
   let taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
+  assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), '');
+  assert.equal(await taskDialog.getByText('로컬 문장 기반 초안입니다. AI 생성 결과는 아닙니다.').count(), 0);
+  await taskDialog.getByRole('button', { name: '초안 제안받기' }).click();
+  await taskDialog.getByText('로컬 문장 기반 초안입니다. AI 생성 결과는 아닙니다.').waitFor();
+  await taskDialog.getByRole('button', { name: /history channel 64/ }).click();
+  assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), 'history channel 64');
+  assert.equal((await db.collection('tasks').get()).size, 0, 'Choosing a suggestion must not create a task.');
   if (process.env.TASKGO_CAPTURE_TASK_DIALOG) {
     await taskDialog.screenshot({ path: resolve(root, '.tmp-day18-dialog.png') });
     await ownerPage.setViewportSize({ width: 390, height: 844 });
@@ -200,6 +207,9 @@ try {
   taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
   assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), '', 'DM text must not become a public task title.');
   await taskDialog.getByText('earlier direct message').waitFor();
+  await taskDialog.getByRole('button', { name: '초안 제안받기' }).click();
+  await taskDialog.getByRole('button', { name: /earlier direct message/ }).click();
+  assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), 'earlier direct message');
   await taskDialog.getByLabel('업무 제목').fill('비공개 대화 후속 업무');
   await taskDialog.getByLabel('담당자').selectOption({ label: member.email });
   await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
@@ -234,7 +244,7 @@ try {
   await visibleOnce(ownerPage, 'offline gap 34');
   assert.ok((await db.collection('messages').get()).size >= 70);
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions verified manual channel/DM task creation, typing, history, offline recovery, and live messages.');
+  console.log('PASS: two Chrome sessions verified explicit local suggestions, editable channel/DM tasks, typing, history, offline recovery, and live messages.');
 } finally {
   await browser?.close();
   await vite?.close();

@@ -6,6 +6,7 @@ import { initializeApp, deleteApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { connectFirestoreEmulator, doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
+import { suggestTaskFromMessage } from '../lib/taskSuggestions.js';
 
 assert.equal(process.env.GCLOUD_PROJECT, 'demo-taskgo');
 const projectId = 'demo-taskgo';
@@ -29,7 +30,7 @@ async function account(name, verified = true) {
   connectFirestoreEmulator(db, '127.0.0.1', firestorePort);
   const functions = getFunctions(app, 'asia-northeast3');
   connectFunctionsEmulator(functions, '127.0.0.1', functionsPort);
-  return { user, db, create: (data) => httpsCallable(functions, 'createTask')(data) };
+  return { user, db, create: (data) => httpsCallable(functions, 'createTask')(data), suggest: (data) => httpsCallable(functions, 'suggestTask')(data) };
 }
 
 async function rejected(promise, code) {
@@ -116,7 +117,43 @@ try {
   await assert.rejects(setDoc(doc(owner.db, 'tasks', 'forged'), { workspaceId, title: 'forged' }), (error) => error.code === 'permission-denied');
   assert.equal((await adminDb.collection('tasks').get()).size, 2);
 
-  console.log('PASS: task schema, role/source validation, review fields, DM privacy, and member-only reads.');
+  const channelSource = { workspaceId, sourceMessageId: 'task-channel-source' };
+  const dmSource = { workspaceId, sourceMessageId: 'task-dm-source' };
+  await rejected(outsider.suggest(channelSource), 'permission-denied');
+  await rejected(owner.suggest(dmSource), 'permission-denied');
+  await rejected(unverified.suggest(channelSource), 'permission-denied');
+  await rejected(member.suggest({ ...dmSource, arbitrary: true }), 'invalid-argument');
+  await rejected(owner.suggest({ workspaceId, sourceMessageId: 'task-foreign-source' }), 'permission-denied');
+  const suggestion = (await member.suggest(dmSource)).data;
+  assert.equal(suggestion.demo, true);
+  assert.equal(suggestion.candidates[0].title, 'Private original text');
+  assert.equal((await adminDb.collection('tasks').get()).size, 2, 'A suggestion must never create a task');
+
+  const sourceTime = (await adminDb.doc('messages/task-dm-source').get()).get('createdAt').toMillis();
+  const contextBatch = adminDb.batch();
+  for (let index = 0; index < 10; index++) contextBatch.set(adminDb.doc(`messages/task-dm-earlier-${index}`), {
+    workspaceId, sourceType: 'dm', dmRoomId: 'task-private', senderId: assignee.user.uid,
+    content: `Earlier private context ${index}`, createdAt: Timestamp.fromMillis(sourceTime - 10000 + index),
+  });
+  contextBatch.set(adminDb.doc('dmRooms/task-other-private'), { workspaceId, participantIds: [owner.user.uid, assignee.user.uid] });
+  contextBatch.set(adminDb.doc('messages/task-other-dm'), {
+    workspaceId, sourceType: 'dm', dmRoomId: 'task-other-private', senderId: owner.user.uid,
+    content: 'OTHER DM MUST NOT LEAK', createdAt: Timestamp.fromMillis(sourceTime - 1),
+  });
+  await contextBatch.commit();
+  let capturedContext;
+  await suggestTaskFromMessage(adminDb, member.user.uid, dmSource, async (context) => {
+    capturedContext = context;
+    return [{ title: '검증 후보', reason: '문맥 범위 확인' }];
+  });
+  assert.equal(capturedContext.messages.length, 8);
+  assert.deepEqual(capturedContext.messages.map((item) => item.content), [
+    ...Array.from({ length: 7 }, (_, index) => `Earlier private context ${index + 3}`),
+    'Private original text',
+  ]);
+  assert.equal(capturedContext.selectedIndex, 7);
+
+  console.log('PASS: task schema, role/source validation, DM privacy, scoped suggestions, and member-only reads.');
 } finally {
   for (const app of apps) await deleteApp(app);
   await deleteAdminApp(admin);

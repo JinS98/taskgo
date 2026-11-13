@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Auth } from 'firebase/auth';
 import type { Functions } from 'firebase/functions';
 import type { CreateTaskRequest, TaskSourceType } from '@taskgo/contracts/task';
-import { createTask, taskCreationError } from './createTaskApi';
+import { createTask, suggestTask, taskCreationError, taskSuggestionError, type TaskSuggestionResult } from './createTaskApi';
 import styles from './TaskCreateDialog.module.scss';
 
 const estimateOptions = [15, 30, 45, 60, 90, 120, 180, 240, 360, 480];
@@ -32,6 +32,9 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
   const [reviewDays, setReviewDays] = useState('2');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const [suggestionPending, setSuggestionPending] = useState(false);
+  const [suggestionError, setSuggestionError] = useState('');
+  const [suggestions, setSuggestions] = useState<TaskSuggestionResult | null>(null);
   const assignees = Object.entries(memberEmails).sort((a, b) => a[1].localeCompare(b[1]));
 
   useEffect(() => {
@@ -40,6 +43,19 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     titleRef.current?.focus();
     return () => { if (dialog?.open) dialog.close(); };
   }, []);
+
+  async function requestSuggestions() {
+    if (suggestionPending || pending) return;
+    setSuggestionPending(true);
+    setSuggestionError('');
+    try {
+      setSuggestions(await suggestTask(auth, functions, { workspaceId, sourceMessageId }));
+    } catch (cause) {
+      setSuggestionError(taskSuggestionError(cause));
+    } finally {
+      setSuggestionPending(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,6 +96,19 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
       <strong>원본 {sourceKind === 'dm' ? 'DM' : '채널'} 메시지</strong>
       <p>{sourceContent}</p>
       <small>원문은 업무에 복사되지 않습니다. 업무 제목과 담당·마감은 워크스페이스 전체에 공개됩니다.</small>
+    </div>
+    <div className={styles.suggestionPanel}>
+      <div className={styles.suggestionIntro}>
+        <div><strong>업무 제목 초안</strong><p>선택한 메시지의 대화 문맥을 참고해 초안을 만듭니다. 선택 후 제목을 수정할 수 있습니다.</p></div>
+        <button type="button" disabled={suggestionPending || pending} onClick={() => void requestSuggestions()}>{suggestionPending ? '만드는 중…' : '초안 제안받기'}</button>
+      </div>
+      {suggestionError && <p className={styles.error} role="alert">{suggestionError}</p>}
+      {suggestions && <div className={styles.suggestionList}>
+        {suggestions.demo && <p className={styles.demoNotice}>로컬 문장 기반 초안입니다. AI 생성 결과는 아닙니다.</p>}
+        {suggestions.candidates.map((candidate, index) => <button type="button" key={`${candidate.title}-${index}`} className={styles.candidate} disabled={pending} onClick={() => { setTitle(candidate.title); titleRef.current?.focus(); }}>
+          <span>{candidate.title}</span><small>{candidate.reason}</small>
+        </button>)}
+      </div>}
     </div>
     <form className={styles.form} onSubmit={(event) => void submit(event)}>
       <label className={styles.field}>업무 제목<input ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required placeholder="팀에 공개할 업무 제목" /></label>

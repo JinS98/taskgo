@@ -9,6 +9,19 @@
 .source strong { color: #c9c1ff; font-size: 12px; }
 .source p { max-height: 110px; margin: 9px 0; overflow: auto; color: #eeeefa; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
 .source small { display: block; color: #b6b4ce; font-size: 11px; line-height: 1.5; }
+.suggestionPanel { margin: 16px 28px 0; padding: 15px 17px; border: 1px solid #4f506f; border-radius: 13px; background: #22263c; }
+.suggestionIntro { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.suggestionIntro strong { color: #e5e2fa; font-size: 13px; }
+.suggestionIntro p { margin: 5px 0 0; color: #b6b4ce; font-size: 11px; line-height: 1.5; }
+.suggestionIntro button { flex: none; padding: 9px 12px; border: 1px solid #8f83df; border-radius: 8px; background: #39365d; color: #eeeaff; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.suggestionIntro button:disabled { cursor: wait; opacity: .6; }
+.suggestionList { display: grid; gap: 8px; margin-top: 12px; }
+.demoNotice { margin: 0; color: #c5bcff; font-size: 11px; }
+.candidate { display: grid; gap: 4px; width: 100%; padding: 10px 12px; border: 1px solid #555675; border-radius: 9px; background: #2b2f4a; color: #f5f3ff; text-align: left; cursor: pointer; font: inherit; }
+.candidate:hover, .candidate:focus-visible { border-color: #aa9bff; background: #353856; }
+.candidate:disabled { cursor: wait; opacity: .6; }
+.candidate span { font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.candidate small { color: #b6b4ce; font-size: 11px; }
 .form { display: grid; gap: 18px; padding: 22px 28px 28px; }
 .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .field { display: grid; align-content: start; gap: 8px; min-width: 0; color: #e5e2fa; font-size: 12px; font-weight: 700; }
@@ -27,6 +40,8 @@
 @media (max-width: 600px) {
   .header { padding: 20px 18px 15px; }
   .source { margin: 16px 18px 0; }
+  .suggestionPanel { margin: 14px 18px 0; }
+  .suggestionIntro { align-items: stretch; flex-direction: column; }
   .form { gap: 15px; padding: 18px; }
   .row { grid-template-columns: 1fr; }
 }
