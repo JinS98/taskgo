@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { connect } from 'node:net';
-import { resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -13,6 +13,39 @@ let stopping = false;
 let stopRunning;
 
 if (!npmCli) throw new Error('npm run dev:all로 실행해 주세요.');
+
+function javaMajor(home) {
+  const executable = join(home, 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
+  if (!existsSync(executable)) return 0;
+  const result = spawnSync(executable, ['-version'], { encoding: 'utf8', windowsHide: true });
+  const version = `${result.stdout ?? ''}${result.stderr ?? ''}`.match(/version "(\d+)(?:\.(\d+))?/);
+  if (result.status !== 0 || !version) return 0;
+  return Number(version[1] === '1' ? version[2] : version[1]);
+}
+
+function javaEnvironment() {
+  const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'path') ?? 'PATH';
+  const candidates = [];
+  if (process.env.JAVA_HOME) candidates.push(process.env.JAVA_HOME);
+  for (const entry of (process.env[pathKey] ?? '').split(delimiter)) {
+    if (entry && existsSync(join(entry, process.platform === 'win32' ? 'java.exe' : 'java'))) candidates.push(dirname(entry));
+  }
+  const installRoots = process.platform === 'win32'
+    ? ['Eclipse Adoptium', 'Java', 'Microsoft'].map((folder) => join(process.env.ProgramFiles ?? 'C:\\Program Files', folder))
+    : ['/usr/lib/jvm'];
+  for (const installRoot of installRoots) {
+    if (!existsSync(installRoot)) continue;
+    for (const entry of readdirSync(installRoot, { withFileTypes: true })) {
+      if (entry.isDirectory()) candidates.push(join(installRoot, entry.name));
+    }
+  }
+  const home = candidates.find((candidate) => javaMajor(candidate) >= 21);
+  if (!home) throw new Error('Firebase 에뮬레이터에 Java 21 이상이 필요합니다. JDK 21을 설치하고 JAVA_HOME을 설정해 주세요.');
+  const env = { ...process.env, JAVA_HOME: home };
+  env[pathKey] = `${join(home, 'bin')}${delimiter}${env[pathKey] ?? ''}`;
+  console.log(`Firebase 에뮬레이터 Java: ${home}`);
+  return env;
+}
 
 function occupied(port, host) {
   return new Promise((done) => {
@@ -79,6 +112,7 @@ async function stopChild(child) {
 }
 
 async function main() {
+  const emulatorEnv = javaEnvironment();
   const busy = [];
   for (const port of fixedPorts) {
     if (await occupied(port, '127.0.0.1')) busy.push(port);
@@ -90,7 +124,7 @@ async function main() {
   await runBuild('build:socket');
   await runBuild('prepare:emulator');
 
-  const emulator = start('Firebase 에뮬레이터', [resolve(root, 'node_modules/firebase-tools/lib/bin/firebase.js'), 'emulators:start', '--only', 'auth,firestore,functions', '--project', 'demo-taskgo']);
+  const emulator = start('Firebase 에뮬레이터', [resolve(root, 'node_modules/firebase-tools/lib/bin/firebase.js'), 'emulators:start', '--only', 'auth,firestore,functions', '--project', 'demo-taskgo'], { env: emulatorEnv });
   await waitFor('Firebase 에뮬레이터', async () => (await Promise.all([9099, 8080, 5001].map((port) => occupied(port, '127.0.0.1')))).every(Boolean), emulator);
 
   const socket = start('채팅 서버', [resolve(root, 'apps/socket-server/dist/index.js')], {
