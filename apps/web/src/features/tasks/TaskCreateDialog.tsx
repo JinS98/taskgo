@@ -1,0 +1,98 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import type { Auth } from 'firebase/auth';
+import type { Functions } from 'firebase/functions';
+import type { CreateTaskRequest, TaskSourceType } from '@taskgo/contracts/task';
+import { createTask, taskCreationError } from './createTaskApi';
+import styles from './TaskCreateDialog.module.scss';
+
+const estimateOptions = [15, 30, 45, 60, 90, 120, 180, 240, 360, 480];
+
+function localDateTime(date: Date): string {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId, sourceContent, sourceKind, memberEmails, onClose, onCreated }: {
+  auth: Auth;
+  functions: Functions;
+  workspaceId: string;
+  sourceMessageId: string;
+  sourceContent: string;
+  sourceKind: TaskSourceType;
+  memberEmails: Record<string, string>;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const [title, setTitle] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [dueLocal, setDueLocal] = useState('');
+  const [estimatedMinutes, setEstimatedMinutes] = useState('');
+  const [reviewRequired, setReviewRequired] = useState(false);
+  const [reviewDays, setReviewDays] = useState('2');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const assignees = Object.entries(memberEmails).sort((a, b) => a[1].localeCompare(b[1]));
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    titleRef.current?.focus();
+    return () => { if (dialog?.open) dialog.close(); };
+  }, []);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) return;
+    const trimmedTitle = title.trim();
+    const dueMillis = Date.parse(dueLocal);
+    if (trimmedTitle.length < 2 || trimmedTitle.length > 160) { setError('업무 제목은 2~160자로 입력해 주세요.'); return; }
+    if (!Number.isFinite(dueMillis) || dueMillis <= Date.now()) { setError('미래의 마감 날짜와 시간을 선택해 주세요.'); return; }
+    if (!memberEmails[assigneeId]) { setError('워크스페이스 멤버를 담당자로 선택해 주세요.'); return; }
+    setPending(true);
+    setError('');
+    const request: CreateTaskRequest = {
+      workspaceId,
+      sourceMessageId,
+      title: trimmedTitle,
+      assigneeId,
+      dueDate: new Date(dueMillis).toISOString(),
+      estimatedMinutes: estimatedMinutes ? Number(estimatedMinutes) : null,
+      reviewRequired,
+      reviewWorkingDays: reviewRequired ? Number(reviewDays) : null,
+    };
+    try {
+      await createTask(auth, functions, request);
+      onCreated();
+    } catch (cause) {
+      setError(taskCreationError(cause));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return <dialog ref={dialogRef} className={styles.dialog} aria-labelledby="task-dialog-title" onCancel={(event) => { event.preventDefault(); if (!pending) onClose(); }}>
+    <div className={styles.header}>
+      <div><p className={styles.eyebrow}>MESSAGE TO TASK</p><h2 id="task-dialog-title">업무 요청 만들기</h2></div>
+      <button type="button" className={styles.close} aria-label="업무 요청 닫기" disabled={pending} onClick={onClose}>×</button>
+    </div>
+    <div className={styles.source}>
+      <strong>원본 {sourceKind === 'dm' ? 'DM' : '채널'} 메시지</strong>
+      <p>{sourceContent}</p>
+      <small>원문은 업무에 복사되지 않습니다. 업무 제목과 담당·마감은 워크스페이스 전체에 공개됩니다.</small>
+    </div>
+    <form className={styles.form} onSubmit={(event) => void submit(event)}>
+      <label className={styles.field}>업무 제목<input ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required placeholder="팀에 공개할 업무 제목" /></label>
+      <div className={styles.row}>
+        <label className={styles.field}>담당자<select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required><option value="">담당자를 선택하세요</option>{assignees.map(([uid, email]) => <option key={uid} value={uid}>{email}</option>)}</select></label>
+        <label className={styles.field}>마감 날짜·시간<input type="datetime-local" value={dueLocal} onChange={(event) => setDueLocal(event.target.value)} min={localDateTime(new Date())} required /></label>
+      </div>
+      <div className={styles.row}>
+        <label className={styles.field}>예상 작업 시간<select value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">선택 안 함</option>{estimateOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes}분` : `${minutes / 60}시간`}</option>)}</select></label>
+        <div className={styles.review}><label className={styles.check}><input type="checkbox" checked={reviewRequired} onChange={(event) => setReviewRequired(event.target.checked)} />완료 후 검수 요청</label>{reviewRequired && <label className={styles.field}>검수 기간<select value={reviewDays} onChange={(event) => setReviewDays(event.target.value)}>{Array.from({ length: 10 }, (_, index) => index + 1).map((days) => <option key={days} value={days}>{days}근무일</option>)}</select></label>}</div>
+      </div>
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      <div className={styles.actions}><button type="button" className={styles.cancel} disabled={pending} onClick={onClose}>취소</button><button type="submit" className={styles.submit} disabled={pending || assignees.length === 0}>{pending ? '저장 중…' : '업무 요청 저장'}</button></div>
+    </form>
+  </dialog>;
+}

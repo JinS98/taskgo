@@ -11,6 +11,12 @@ import { createServer as createViteServer } from 'vite';
 
 const projectId = 'demo-taskgo';
 assert.equal(process.env.GCLOUD_PROJECT, projectId, 'Run with the demo-taskgo Firebase emulators.');
+const authPort = Number(process.env.TASKGO_AUTH_EMULATOR_PORT ?? 9099);
+const firestorePort = Number(process.env.TASKGO_FIRESTORE_EMULATOR_PORT ?? 8080);
+const functionsPort = Number(process.env.TASKGO_FUNCTIONS_EMULATOR_PORT ?? 5001);
+process.env.VITE_AUTH_EMULATOR_PORT = String(authPort);
+process.env.VITE_FIRESTORE_EMULATOR_PORT = String(firestorePort);
+process.env.VITE_FUNCTIONS_EMULATOR_PORT = String(functionsPort);
 const root = resolve(process.cwd(), '../..');
 const admin = initializeApp({ projectId }, 'live-chat-browser-test');
 const db = getFirestore(admin);
@@ -118,6 +124,40 @@ try {
   await visibleOnce(ownerPage, 'history channel 0');
   assert.equal(await ownerPage.getByRole('button', { name: '이전 대화 불러오기' }).count(), 0);
 
+  const channelSource = ownerPage.getByRole('listitem').filter({ hasText: 'history channel 64' });
+  await channelSource.getByRole('button', { name: '업무 요청' }).click();
+  await ownerPage.getByRole('dialog', { name: '업무 요청 만들기' }).waitFor();
+  await ownerPage.keyboard.press('Escape');
+  await ownerPage.getByRole('dialog', { name: '업무 요청 만들기' }).waitFor({ state: 'hidden' });
+  assert.equal((await db.collection('tasks').get()).size, 0, 'Closing the draft must not create a task.');
+  await channelSource.getByRole('button', { name: '업무 요청' }).click();
+  let taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
+  if (process.env.TASKGO_CAPTURE_TASK_DIALOG) {
+    await taskDialog.screenshot({ path: resolve(root, '.tmp-day18-dialog.png') });
+    await ownerPage.setViewportSize({ width: 390, height: 844 });
+    await taskDialog.screenshot({ path: resolve(root, '.tmp-day18-dialog-mobile.png') });
+    await ownerPage.setViewportSize({ width: 1280, height: 720 });
+  }
+  const dueLocal = await ownerPage.evaluate(() => {
+    const nextDay = new Date(Date.now() + 86400000);
+    return new Date(nextDay.getTime() - nextDay.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  });
+  await taskDialog.getByLabel('업무 제목').fill('고객 요청 정리');
+  await taskDialog.getByLabel('담당자').selectOption({ label: member.email });
+  await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
+  await taskDialog.getByLabel('예상 작업 시간').selectOption('90');
+  await taskDialog.getByRole('button', { name: '업무 요청 저장' }).click();
+  await ownerPage.getByText('업무 요청이 저장되었습니다.').waitFor();
+  const channelTasks = await db.collection('tasks').get();
+  assert.equal(channelTasks.size, 1);
+  assert.equal(channelTasks.docs[0].get('sourceMessageId'), 'history-channel-64');
+  assert.equal(channelTasks.docs[0].get('requesterId'), owner.uid);
+  assert.equal(channelTasks.docs[0].get('assigneeId'), member.uid);
+  assert.equal(channelTasks.docs[0].get('title'), '고객 요청 정리');
+  assert.equal(channelTasks.docs[0].get('status'), 'REQUESTED');
+  assert.equal(channelTasks.docs[0].get('estimatedMinutes'), 90);
+  assert.equal(channelTasks.docs[0].get('reviewRequired'), false);
+
   await send(ownerPage, 'owner channel message');
   await visibleOnce(ownerPage, 'owner channel message');
   await visibleOnce(memberPage, 'owner channel message');
@@ -156,6 +196,23 @@ try {
   await memberPage.getByRole('button', { name: owner.email }).click();
   await visibleOnce(ownerPage, 'earlier direct message');
   await visibleOnce(memberPage, 'earlier direct message');
+  await ownerPage.getByRole('listitem').filter({ hasText: 'earlier direct message' }).getByRole('button', { name: '업무 요청' }).click();
+  taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
+  assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), '', 'DM text must not become a public task title.');
+  await taskDialog.getByText('earlier direct message').waitFor();
+  await taskDialog.getByLabel('업무 제목').fill('비공개 대화 후속 업무');
+  await taskDialog.getByLabel('담당자').selectOption({ label: member.email });
+  await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
+  await taskDialog.getByLabel('완료 후 검수 요청').check();
+  await taskDialog.getByLabel('검수 기간').selectOption('2');
+  await taskDialog.getByRole('button', { name: '업무 요청 저장' }).click();
+  await ownerPage.getByText('업무 요청이 저장되었습니다.').waitFor();
+  const dmTask = (await db.collection('tasks').where('sourceMessageId', '==', 'history-dm').get()).docs[0];
+  assert.ok(dmTask);
+  assert.equal(dmTask.get('sourceType'), 'dm');
+  assert.equal(dmTask.get('reviewRequired'), true);
+  assert.equal(dmTask.get('reviewWorkingDays'), 2);
+  assert.equal('content' in dmTask.data(), false);
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await memberPage.getByText('실시간 연결됨').waitFor();
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('typing in DM');
@@ -177,7 +234,7 @@ try {
   await visibleOnce(ownerPage, 'offline gap 34');
   assert.ok((await db.collection('messages').get()).size >= 70);
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions verified channel/DM typing, connection states, paginated history, offline recovery, and live messages.');
+  console.log('PASS: two Chrome sessions verified manual channel/DM task creation, typing, history, offline recovery, and live messages.');
 } finally {
   await browser?.close();
   await vite?.close();

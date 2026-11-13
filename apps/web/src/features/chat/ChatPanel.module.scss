@@ -8,6 +8,8 @@
 .connectionError button { flex: 0 0 auto; padding: 6px 10px; border: 1px solid #c996a2; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: 700; }
 .sendError { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px clamp(20px, 4vw, 48px); background: #4a3448; color: #ffe3e5; font-size: 13px; }
 .sendError button { padding: 2px 7px; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 20px; }
+.taskNotice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px clamp(20px, 4vw, 48px); background: #304c49; color: #d7fff0; font-size: 13px; }
+.taskNotice button { padding: 2px 7px; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 20px; }
 .messages { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 28px clamp(20px, 4vw, 48px); scrollbar-width: thin; scrollbar-color: #626083 var(--page); }
 .messages::-webkit-scrollbar { width: 10px; }
 .messages::-webkit-scrollbar-track { background: var(--page); }
@@ -28,6 +30,8 @@
 .own .messageBody p { max-width: 100%; padding: 10px 14px; border: 1px solid #625987; border-radius: 14px 4px 14px 14px; background: #403b60; text-align: left; }
 .failed { color: #ffb4b4 !important; }
 .retry { margin-top: 5px; padding: 0; border: 0; background: transparent; color: #ffb4b4; cursor: pointer; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.taskAction { margin-top: 7px; padding: 4px 8px; border: 1px solid #625d86; border-radius: 7px; background: #302f4a; color: #cbc3ff; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }
+.taskAction:hover, .taskAction:focus-visible { border-color: #aa9bff; color: #fff; }
 .composerWrap { flex: 0 0 auto; padding: 16px clamp(20px, 4vw, 48px) 20px; border-top: 1px solid var(--line); background: #22263d; }
 .typingIndicator { min-height: 20px; max-width: 900px; margin: 0 auto 5px; overflow: hidden; color: #c8bfff; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .typingDots { margin-right: 7px; color: var(--accent); letter-spacing: 2px; }
