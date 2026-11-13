@@ -2,37 +2,32 @@ import assert from 'node:assert/strict';
 import { initializeApp as initializeAdminApp, deleteApp as deleteAdminApp } from 'firebase-admin/app';
 import { getFirestore as getAdminFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { applyActionCode, connectAuthEmulator, createUserWithEmailAndPassword, getAuth, getIdToken, GoogleAuthProvider, reload, sendEmailVerification, signInWithCredential } from 'firebase/auth';
+import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, getIdToken, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { collection, connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 
 process.env.FIRESTORE_EMULATOR_HOST ||= '127.0.0.1:8080';
 process.env.FIREBASE_AUTH_EMULATOR_HOST ||= '127.0.0.1:9099';
+const authPort = Number(process.env.FIREBASE_AUTH_EMULATOR_HOST.split(':').at(-1));
+const firestorePort = Number(process.env.FIRESTORE_EMULATOR_HOST.split(':').at(-1));
+const functionsPort = Number(process.env.VITE_FUNCTIONS_EMULATOR_PORT || 5001);
 const projectId = 'demo-taskgo';
 const adminApp = initializeAdminApp({ projectId }, 'workspace-test-admin');
 const adminDb = getAdminFirestore(adminApp);
 const apps = [];
 let rules;
 
-async function account(name, email, verify = true) {
+async function account(name, email) {
   const app = initializeApp({ apiKey: 'demo-taskgo-key', authDomain: 'demo-taskgo.firebaseapp.com', projectId, appId: 'demo-taskgo-web' }, name);
   apps.push(app);
   const auth = getAuth(app);
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectAuthEmulator(auth, `http://127.0.0.1:${authPort}`, { disableWarnings: true });
   const db = getFirestore(app);
-  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectFirestoreEmulator(db, '127.0.0.1', firestorePort);
   const functions = getFunctions(app, 'asia-northeast3');
-  connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+  connectFunctionsEmulator(functions, '127.0.0.1', functionsPort);
   const { user } = await createUserWithEmailAndPassword(auth, email, 'StrongPass123!');
-  if (verify) {
-    await sendEmailVerification(user);
-    const { oobCodes } = await fetch('http://127.0.0.1:9099/emulator/v1/projects/demo-taskgo/oobCodes').then((response) => response.json());
-    const code = oobCodes.find((item) => item.email === email && item.requestType === 'VERIFY_EMAIL')?.oobCode;
-    assert.ok(code);
-    await applyActionCode(auth, code);
-    await reload(user);
-  }
   const call = (name, data) => httpsCallable(functions, name)(data);
   return { user, auth, db, call };
 }
@@ -57,17 +52,19 @@ try {
   const googleApp = initializeApp({ apiKey: 'demo-taskgo-key', authDomain: 'demo-taskgo.firebaseapp.com', projectId, appId: 'demo-taskgo-web' }, 'google-owner');
   apps.push(googleApp);
   const googleAuth = getAuth(googleApp);
-  connectAuthEmulator(googleAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectAuthEmulator(googleAuth, `http://127.0.0.1:${authPort}`, { disableWarnings: true });
   const googleDb = getFirestore(googleApp);
-  connectFirestoreEmulator(googleDb, '127.0.0.1', 8080);
+  connectFirestoreEmulator(googleDb, '127.0.0.1', firestorePort);
   const googleUser = (await signInWithCredential(googleAuth, GoogleAuthProvider.credential(JSON.stringify({ sub: 'workspace-google-owner', email: 'google-owner@gmail.com', email_verified: true })))).user;
   const googleWorkspaceId = await createWorkspace({ user: googleUser, db: googleDb }, 'Google Team');
   assert.equal((await adminDb.doc(`workspaces/${googleWorkspaceId}`).get()).get('ownerId'), googleUser.uid);
   const guest = await account('guest', 'guest@example.com');
   const stranger = await account('stranger', 'stranger@gmail.com');
-  const unverified = await account('unverified', 'unverified@gmail.com', false);
+  const unverified = await account('unverified', 'unverified@gmail.com');
 
-  await assert.rejects(createWorkspace(unverified, 'Unauthorized'), (error) => error.code === 'permission-denied');
+  assert.equal(owner.user.emailVerified, false);
+  const unverifiedWorkspaceId = await createWorkspace(unverified, 'Immediate Team');
+  assert.equal((await adminDb.doc(`workspaces/${unverifiedWorkspaceId}`).get()).get('ownerId'), unverified.user.uid);
   const workspaceId = await createWorkspace(owner, 'Taskgo Team');
   assert.equal((await adminDb.collection('workspaceInvites').get()).size, 0);
   await assert.rejects(setDoc(doc(collection(owner.db, 'workspaces')), { name: 'Incomplete', ownerId: owner.user.uid, createdAt: serverTimestamp() }), (error) => error.code === 'permission-denied');
@@ -102,7 +99,7 @@ try {
   assert.equal(results.filter((result) => result.status === 'rejected').length, 1);
   assert.equal((await adminDb.doc(`workspaceInvites/${race.inviteId}`).get()).get('status'), 'accepted');
 
-  rules = await initializeTestEnvironment({ projectId, firestore: { host: '127.0.0.1', port: 8080 } });
+  rules = await initializeTestEnvironment({ projectId, firestore: { host: '127.0.0.1', port: firestorePort } });
   const ownerDb = rules.authenticatedContext(owner.user.uid).firestore();
   const guestDb = rules.authenticatedContext(guest.user.uid).firestore();
   const unknownDb = rules.authenticatedContext(unverified.user.uid).firestore();

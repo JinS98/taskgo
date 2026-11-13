@@ -5,8 +5,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function verifiedCreator() {
-      return signedIn() && request.auth.token.email_verified == true && request.auth.token.email is string;
+    function eligibleCreator() {
+      return signedIn() && request.auth.token.email is string;
     }
 
     function requiredFields(data, fields) {
@@ -24,7 +24,7 @@ service cloud.firestore {
 
     match /users/{userId}/workspaces/{workspaceId} {
       allow get, list: if signedIn() && request.auth.uid == userId;
-      allow create: if verifiedCreator() && userId == request.auth.uid
+      allow create: if eligibleCreator() && userId == request.auth.uid
         && !exists(/databases/$(database)/documents/workspaces/$(workspaceId))
         && requiredFields(request.resource.data, ['workspaceId', 'name', 'role', 'joinedAt'])
         && request.resource.data.workspaceId == workspaceId
@@ -37,7 +37,7 @@ service cloud.firestore {
 
     match /workspaces/{workspaceId} {
       allow get, list: if isMember(workspaceId);
-      allow create: if verifiedCreator()
+      allow create: if eligibleCreator()
         && requiredFields(request.resource.data, ['name', 'ownerId', 'createdAt'])
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.name is string
@@ -50,9 +50,11 @@ service cloud.firestore {
 
       match /members/{memberId} {
         allow get, list: if isMember(workspaceId);
-        allow create: if verifiedCreator() && memberId == request.auth.uid
+        allow create: if eligibleCreator() && memberId == request.auth.uid
           && !exists(/databases/$(database)/documents/workspaces/$(workspaceId))
-          && requiredFields(request.resource.data, ['uid', 'email', 'role', 'joinedAt'])
+          && request.resource.data.keys().hasAll(['uid', 'email', 'role', 'joinedAt'])
+          && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'joinedAt'])
+          && (!('displayName' in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() >= 1 && request.resource.data.displayName.size() <= 80))
           && request.resource.data.uid == memberId
           && request.resource.data.email == request.auth.token.email
           && request.resource.data.role == 'owner'

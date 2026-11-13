@@ -23,7 +23,7 @@ export function createFirebaseSocketServices(projectId: string): SocketServices 
     async verifyIdentity(token) {
       try {
         const decoded = await auth.verifyIdToken(token, true);
-        if (decoded.email_verified !== true) return null;
+        if (!decoded.email) return null;
         return { uid: decoded.uid, expiresAt: decoded.exp * 1000 };
       } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';

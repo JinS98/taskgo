@@ -3,7 +3,7 @@ import { initializeApp as initializeAdminApp, deleteApp as deleteAdminApp } from
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { applyActionCode, connectAuthEmulator, createUserWithEmailAndPassword, getAuth, getIdToken, GoogleAuthProvider, reload, sendEmailVerification, signInWithCredential } from 'firebase/auth';
+import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, getIdToken, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { connectFirestoreEmulator, doc, getDoc, getFirestore as getClientFirestore, setDoc } from 'firebase/firestore';
 import { io as createClient } from 'socket.io-client';
 import { createSocketApp, listenSocketApp, closeSocketApp } from '../dist/app.js';
@@ -12,6 +12,8 @@ import { createFirebaseSocketServices } from '../dist/firebase.js';
 assert.equal(process.env.GCLOUD_PROJECT, 'demo-taskgo');
 assert.ok(process.env.FIREBASE_AUTH_EMULATOR_HOST);
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST);
+const authPort = Number(process.env.FIREBASE_AUTH_EMULATOR_HOST.split(':').at(-1));
+const firestorePort = Number(process.env.FIRESTORE_EMULATOR_HOST.split(':').at(-1));
 const projectId = 'demo-taskgo';
 const allowedOrigin = 'http://localhost:5173';
 const adminApp = initializeAdminApp({ projectId }, 'socket-test-fixture');
@@ -32,23 +34,15 @@ const app = createSocketApp({ allowedOrigins: [allowedOrigin], services: {
 const webApps = [];
 const clients = [];
 
-async function account(name, verified = true) {
+async function account(name) {
   const webApp = initializeApp({ apiKey: 'demo-taskgo-key', authDomain: 'demo-taskgo.firebaseapp.com', projectId, appId: 'demo-taskgo-web' }, name);
   webApps.push(webApp);
   const auth = getAuth(webApp);
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectAuthEmulator(auth, `http://127.0.0.1:${authPort}`, { disableWarnings: true });
   const clientDb = getClientFirestore(webApp);
-  connectFirestoreEmulator(clientDb, '127.0.0.1', 8080);
+  connectFirestoreEmulator(clientDb, '127.0.0.1', firestorePort);
   const email = `${name}@example.com`;
   const { user } = await createUserWithEmailAndPassword(auth, email, 'StrongPass123!');
-  if (verified) {
-    await sendEmailVerification(user);
-    const { oobCodes } = await fetch('http://127.0.0.1:9099/emulator/v1/projects/demo-taskgo/oobCodes').then((response) => response.json());
-    const code = oobCodes.find((item) => item.email === email && item.requestType === 'VERIFY_EMAIL')?.oobCode;
-    assert.ok(code);
-    await applyActionCode(auth, code);
-    await reload(user);
-  }
   return { uid: user.uid, token: await getIdToken(user, true), clientDb };
 }
 
@@ -107,7 +101,7 @@ try {
   const owner = await account('socket-owner');
   const member = await account('socket-member');
   const outsider = await account('socket-outsider');
-  const unverified = await account('socket-unverified', false);
+  const unverified = await account('socket-unverified');
   const disabled = await account('socket-disabled');
   const revoked = await account('socket-revoked');
   await adminAuth.updateUser(disabled.uid, { disabled: true });
@@ -117,9 +111,9 @@ try {
   const googleApp = initializeApp({ apiKey: 'demo-taskgo-key', authDomain: 'demo-taskgo.firebaseapp.com', projectId, appId: 'demo-taskgo-web' }, 'socket-google');
   webApps.push(googleApp);
   const googleAuth = getAuth(googleApp);
-  connectAuthEmulator(googleAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectAuthEmulator(googleAuth, `http://127.0.0.1:${authPort}`, { disableWarnings: true });
   const googleDb = getClientFirestore(googleApp);
-  connectFirestoreEmulator(googleDb, '127.0.0.1', 8080);
+  connectFirestoreEmulator(googleDb, '127.0.0.1', firestorePort);
   const googleUser = (await signInWithCredential(googleAuth, GoogleAuthProvider.credential(JSON.stringify({ sub: 'socket-google', email: 'socket-google@gmail.com', email_verified: true })))).user;
   const google = { uid: googleUser.uid, token: await getIdToken(googleUser, true), clientDb: googleDb };
 
@@ -144,7 +138,6 @@ try {
 
   await rejectedConnection(url, null, 'UNAUTHENTICATED');
   await rejectedConnection(url, 'forged-token', 'UNAUTHENTICATED');
-  await rejectedConnection(url, unverified.token, 'UNAUTHENTICATED');
   await rejectedConnection(url, disabled.token, 'UNAUTHENTICATED');
   await rejectedConnection(url, revoked.token, 'UNAUTHENTICATED');
   for (const transport of ['websocket', 'polling']) await rejectedConnection(url, owner.token, null, 'http://untrusted.invalid', transport);
@@ -152,6 +145,8 @@ try {
   const { client: ownerClient, connected } = openClient(url, owner.token);
   const ready = new Promise((resolve) => ownerClient.once('server:ready', resolve));
   await connected;
+  const { client: unverifiedClient, connected: unverifiedConnected } = openClient(url, unverified.token);
+  await unverifiedConnected;
   assert.deepEqual(await ready, { protocolVersion: 1 });
   const { client: memberClient, connected: memberConnected } = openClient(url, member.token);
   await memberConnected;
@@ -161,6 +156,7 @@ try {
   await googleConnected;
 
   const channel = { workspaceId: 'socket-team', kind: 'channel', roomId: 'general' };
+  await ack(unverifiedClient, 'room:join', channel, 'FORBIDDEN');
   const dm = { workspaceId: 'socket-team', kind: 'dm', roomId: 'private' };
   await ack(ownerClient, 'room:join', channel);
   await ack(memberClient, 'room:join', channel);

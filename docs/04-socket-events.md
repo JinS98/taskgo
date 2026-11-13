@@ -2,7 +2,7 @@
 
 10일차에 `shared/contracts/src/socket.ts`에 타입 계약을 추가했다. 소켓 연결 시 서버가 `server:ready`와 `protocolVersion: 1`을 보낸다. 룸 입장·퇴장, 메시지 전송, 타이핑 요청은 모두 ACK를 사용한다. ACK는 `{ ok: true, data }` 또는 `{ ok: false, error: { code, message } }` 형태다.
 
-11일차부터 연결 옵션의 `auth.token`으로 Firebase ID 토큰을 전달한다. 서버는 연결 시 토큰과 이메일 확인 상태를 검증하며, 유효하지 않으면 `connect_error`의 `data.code`를 `UNAUTHENTICATED`로 돌려준다. 인증 서비스 오류는 `AUTH_UNAVAILABLE`이다. 토큰 만료 시 연결을 종료하므로 클라이언트는 갱신된 토큰으로 재연결해야 한다. `room:join`은 워크스페이스 멤버십과 채널 소속 또는 DM 참여를 확인한 뒤 성공 ACK를 보낸다.
+11일차부터 연결 옵션의 `auth.token`으로 Firebase ID 토큰을 전달한다. 서버는 연결 시 토큰과 이메일 존재 여부를 검증하며, 유효하지 않으면 `connect_error`의 `data.code`를 `UNAUTHENTICATED`로 돌려준다. 인증 서비스 오류는 `AUTH_UNAVAILABLE`이다. 토큰 만료 시 연결을 종료하므로 클라이언트는 갱신된 토큰으로 재연결해야 한다. `room:join`은 워크스페이스 멤버십과 채널 소속 또는 DM 참여를 확인한 뒤 성공 ACK를 보낸다.
 
 12일차부터 `message:send`는 룸 참가와 현재 권한을 확인하고 Firestore 트랜잭션에서 멤버십·룸·중복 ID를 다시 확인한다. 한 사용자에게 `clientMessageId`는 모든 룸에서 고유해야 한다. 저장 성공 후 `{ ok: true, data: { messageId } }` ACK를 보내고, 현재 권한이 있는 룸 소켓에만 `message:created`를 전파한다. 동일 요청의 재전송은 같은 `messageId`를 반환하되 재전파하지 않는다. 동일 ID에 다른 내용이나 룸을 제출하면 `CONFLICT`다. 저장 실패는 `INTERNAL_ERROR`이며 저장 전에는 성공 ACK를 보내지 않는다. 성공 ACK는 저장 완료를 뜻하며 모든 수신자에게 전달됐다는 보장은 아니다.
 

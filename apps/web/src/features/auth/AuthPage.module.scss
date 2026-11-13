@@ -10,5 +10,5 @@
 .primaryButton { background:var(--accent); color:#fff; }.primaryButton:hover { background:#493ab9; }.secondaryButton { border-color:#dce1e9; background:#fff; color:#526075; }.textButton { background:transparent; color:var(--accent); }
 .divider { display:flex; align-items:center; gap:12px; margin:20px 0; color:#9aa4b2; font-size:12px; }.divider::before,.divider::after { flex:1; border-top:1px solid var(--line); content:''; }
 .note { margin:18px 0 0; color:var(--muted); font-size:12px; line-height:1.6; }.error,.success { margin:8px 0; padding:10px 12px; border-radius:8px; font-size:13px; line-height:1.5; }.error { border:1px solid #f1d5db; background:#fff2f4; color:#9c3e50; }.success { border:1px solid #cfe8de; background:#ecf8f3; color:#176b59; }
-.verifyCard { grid-column:1/-1; justify-self:center; max-width:480px; }.statusPage { display:grid; place-content:center; min-height:100dvh; padding:24px; color:var(--soft-text); text-align:center; }
+.statusPage { display:grid; place-content:center; min-height:100dvh; padding:24px; color:var(--soft-text); text-align:center; }
 @media (max-width:860px) { .page { grid-template-columns:minmax(0,1fr); gap:32px; padding:24px; } .intro { justify-self:center; width:100%; max-width:430px; } .intro h1 { font-size:36px; } .brand { margin-bottom:28px; } .card { justify-self:center; max-width:430px; } }

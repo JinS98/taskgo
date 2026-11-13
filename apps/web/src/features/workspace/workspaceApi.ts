@@ -4,13 +4,13 @@ import { httpsCallable, type Functions } from 'firebase/functions';
 
 export async function createWorkspace(auth: Auth, db: Firestore, name: string): Promise<{ workspaceId: string }> {
   const user = auth.currentUser;
-  if (!user?.email || !user.emailVerified) throw new Error('이메일 확인 후 워크스페이스를 만들 수 있습니다.');
+  if (!user?.email) throw new Error('이메일 계정으로 로그인해 주세요.');
   await getIdToken(user, true);
   const workspace = doc(collection(db, 'workspaces'));
   const batch = writeBatch(db);
   const trimmedName = name.trim();
   batch.set(workspace, { name: trimmedName, ownerId: user.uid, createdAt: serverTimestamp() });
-  batch.set(doc(db, 'workspaces', workspace.id, 'members', user.uid), { uid: user.uid, email: user.email, role: 'owner', joinedAt: serverTimestamp() });
+  batch.set(doc(db, 'workspaces', workspace.id, 'members', user.uid), { uid: user.uid, email: user.email, displayName: user.displayName?.trim().slice(0, 80) || user.email.split('@')[0], role: 'owner', joinedAt: serverTimestamp() });
   batch.set(doc(db, 'users', user.uid, 'workspaces', workspace.id), { workspaceId: workspace.id, name: trimmedName, role: 'owner', joinedAt: serverTimestamp() });
   await batch.commit();
   return { workspaceId: workspace.id };
@@ -24,7 +24,7 @@ export async function callWorkspace<T>(auth: Auth, functions: Functions, name: s
 
 export function workspaceCreationError(error: unknown): string {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-  if (code === 'permission-denied') return '워크스페이스 생성 권한이 없습니다. 이메일 인증과 Firestore 규칙을 확인해 주세요.';
+  if (code === 'permission-denied') return '워크스페이스 생성 권한이 없습니다. 로그인 상태와 Firestore 규칙을 확인해 주세요.';
   if (code === 'unavailable') return 'Firestore에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.';
   return error instanceof Error && !code ? error.message : '워크스페이스를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }

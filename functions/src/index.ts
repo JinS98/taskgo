@@ -18,17 +18,17 @@ const taskAiKey = defineSecret('OPENAI_API_KEY');
 const inviteLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 
 export const createTask = onCall({ region }, async (request) => {
-  const user = await verifiedUser(request);
+  const user = await activeUser(request);
   return createTaskRecord(db, user.uid, request.data);
 });
 
 export const respondTask = onCall({ region }, async (request) => {
-  const user = await verifiedUser(request);
+  const user = await activeUser(request);
   return respondToTaskRequest(db, user.uid, request.data);
 });
 
 export const suggestTask = onCall({ region, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {
-  const user = await verifiedUser(request);
+  const user = await activeUser(request);
   const apiKey = taskAiKey.value();
   if (process.env.FUNCTIONS_EMULATOR === 'true' && (process.env.TASKGO_AI_MOCK === '1' || !apiKey || apiKey === 'local-disabled')) {
     return suggestTaskFromMessage(db, user.uid, request.data, localTaskCandidates, true);
@@ -44,10 +44,10 @@ function field(data: unknown, key: string): string {
   return value.trim();
 }
 
-async function verifiedUser(request: CallableRequest<unknown>): Promise<UserRecord> {
+async function activeUser(request: CallableRequest<unknown>): Promise<UserRecord> {
   if (!request.auth) throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
   const user = await getAuth().getUser(request.auth.uid);
-  if (user.disabled || !user.email || !user.emailVerified) throw new HttpsError('permission-denied', '확인된 활성 이메일 계정이 필요합니다.');
+  if (user.disabled || !user.email) throw new HttpsError('permission-denied', '활성 이메일 계정이 필요합니다.');
   return user;
 }
 
@@ -68,7 +68,7 @@ function inviteLink(inviteId: string, token: string): string {
 }
 
 export const inviteMember = onCall({ region, secrets: [smtpUrl] }, async (request) => {
-  const user = await verifiedUser(request);
+  const user = await activeUser(request);
   const workspaceId = field(request.data, 'workspaceId');
   const invitedEmail = field(request.data, 'email').toLowerCase();
   if (invitedEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(invitedEmail)) {
@@ -125,7 +125,7 @@ export const inviteMember = onCall({ region, secrets: [smtpUrl] }, async (reques
 });
 
 export const listInvites = onCall({ region }, async (request) => {
-  const user = await verifiedUser(request);
+  const user = await activeUser(request);
   const workspaceId = field(request.data, 'workspaceId');
   await ownerWorkspace(workspaceId, user.uid);
   const snapshot = await db.collection('workspaceInvites').where('workspaceId', '==', workspaceId).get();
@@ -138,7 +138,7 @@ export const listInvites = onCall({ region }, async (request) => {
 });
 
 export const revokeInvite = onCall({ region }, async (request) => {
-  const user = await verifiedUser(request);
+  const user = await activeUser(request);
   const invite = db.doc(`workspaceInvites/${field(request.data, 'inviteId')}`);
   await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(invite);
@@ -152,7 +152,7 @@ export const revokeInvite = onCall({ region }, async (request) => {
 });
 
 export const acceptInvite = onCall({ region }, async (request) => {
-  const user = await verifiedUser(request);
+  const user = await activeUser(request);
   const inviteId = field(request.data, 'inviteId');
   const token = field(request.data, 'token');
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new HttpsError('invalid-argument', '초대 링크가 올바르지 않습니다.');
@@ -170,7 +170,7 @@ export const acceptInvite = onCall({ region }, async (request) => {
     if (!workspace.exists) throw new HttpsError('not-found', '워크스페이스가 없습니다.');
     const member = workspace.ref.collection('members').doc(user.uid);
     if ((await transaction.get(member)).exists) throw new HttpsError('already-exists', '이미 워크스페이스 멤버입니다.');
-    transaction.create(member, { uid: user.uid, email: user.email!.toLowerCase(), role: 'member', joinedAt: FieldValue.serverTimestamp() });
+    transaction.create(member, { uid: user.uid, email: user.email!.toLowerCase(), displayName: user.displayName?.trim().slice(0, 80) || user.email!.split('@')[0], role: 'member', joinedAt: FieldValue.serverTimestamp() });
     transaction.create(db.doc(`users/${user.uid}/workspaces/${workspaceId}`), { workspaceId, name: workspace.get('name'), role: 'member', joinedAt: FieldValue.serverTimestamp() });
     transaction.update(invite, { status: 'accepted', acceptedBy: user.uid, acceptedAt: FieldValue.serverTimestamp() });
     return { workspaceId };

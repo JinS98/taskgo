@@ -11,7 +11,7 @@ import styles from './WorkspaceGate.module.scss';
 
 interface Membership { workspaceId: string; name: string; role: 'owner' | 'member' }
 interface Invite { inviteId: string; email: string; status: string; expiresAt: string }
-interface Member { uid: string; email: string; role: 'owner' | 'member' }
+interface Member { uid: string; email: string; displayName?: string; role: 'owner' | 'member' }
 
 function PickerMark() {
   return <svg className={styles.pickerMark} aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 7.5 5 5 5-5" /></svg>;
@@ -180,7 +180,7 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
 
   return (
     <div className={styles.shell}>
-      <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={user.email ?? '나'} canManageWorkspace={selected.role === 'owner'} workspaceControls={
+      <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={user.displayName || user.email || '나'} canManageWorkspace={selected.role === 'owner'} workspaceControls={
         <div className={styles.workspacePicker} ref={pickerRef}>
           <button ref={pickerButtonRef} type="button" aria-label="워크스페이스 선택" aria-expanded={pickerOpen} aria-controls="workspace-options" onClick={() => setPickerOpen((open) => !open)}>
             <span className={styles.pickerIcon} aria-hidden="true">{selected.name.charAt(0).toUpperCase()}</span>
@@ -209,7 +209,7 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
           </section>
           <section className={`${styles.managementCard} ${styles.wideCard}`} aria-labelledby="members-title"><div className={styles.cardHeading}><h2 id="members-title">워크스페이스 멤버</h2><span>{membersWorkspaceId === selected.workspaceId ? members.length : 0}명</span></div>
             {membersError && <p className={styles.error} role="alert">{membersError}</p>}
-            {!membersError && (membersWorkspaceId === selected.workspaceId ? <ul className={styles.members}>{members.map((member) => <li key={member.uid}><span className={styles.memberAvatar} aria-hidden="true">{member.email.charAt(0).toUpperCase()}</span><span className={styles.memberIdentity}>{member.email}<small>{member.role === 'owner' ? '워크스페이스 장' : '멤버'}</small></span></li>)}</ul> : <p className={styles.empty}>멤버를 불러오는 중입니다…</p>)}
+            {!membersError && (membersWorkspaceId === selected.workspaceId ? <ul className={styles.members}>{members.map((member) => <li key={member.uid}><span className={styles.memberAvatar} aria-hidden="true">{(member.displayName || member.email).charAt(0).toUpperCase()}</span><span className={styles.memberIdentity}>{member.displayName || member.email}<small>{member.displayName ? `${member.email} · ` : ''}{member.role === 'owner' ? '워크스페이스 장' : '멤버'}</small></span></li>)}</ul> : <p className={styles.empty}>멤버를 불러오는 중입니다…</p>)}
           </section>
         </div>
       </div>} />

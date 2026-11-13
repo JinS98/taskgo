@@ -17,10 +17,10 @@ const admin = initializeAdminApp({ projectId }, 'task-model-test');
 const adminDb = getAdminFirestore(admin);
 const apps = [];
 
-async function account(name, verified = true) {
+async function account(name) {
   const email = `${name}@example.com`;
   const password = 'StrongPass123!';
-  const user = await getAdminAuth(admin).createUser({ email, password, emailVerified: verified });
+  const user = await getAdminAuth(admin).createUser({ email, password, emailVerified: false });
   const app = initializeApp({ apiKey: 'demo-taskgo-key', authDomain: 'demo-taskgo.firebaseapp.com', projectId, appId: 'demo-taskgo-web' }, name);
   apps.push(app);
   const auth = getAuth(app);
@@ -42,7 +42,7 @@ try {
   const member = await account('task-member');
   const assignee = await account('task-assignee');
   const outsider = await account('task-outsider');
-  const unverified = await account('task-unverified', false);
+  const nonMember = await account('task-nonmember');
   const workspaceId = 'task-team';
   const batch = adminDb.batch();
   batch.set(adminDb.doc(`workspaces/${workspaceId}`), { name: 'Task Team', ownerId: owner.user.uid });
@@ -70,7 +70,7 @@ try {
   const dueDate = new Date(Date.now() + 86400000).toISOString();
   const input = { workspaceId, sourceMessageId: 'task-channel-source', title: '  모델 검증 업무  ', description: '  검토 메모  ', assigneeId: assignee.user.uid, dueDate, reviewRequired: false };
   await rejected(outsider.create(input), 'permission-denied');
-  await rejected(unverified.create(input), 'permission-denied');
+  await rejected(nonMember.create(input), 'permission-denied');
   await rejected(owner.create({ ...input, requesterId: outsider.user.uid }), 'invalid-argument');
   await rejected(owner.create({ ...input, status: 'DONE' }), 'invalid-argument');
   await rejected(owner.create({ ...input, assigneeId: outsider.user.uid }), 'failed-precondition');
@@ -126,7 +126,7 @@ try {
   const dmSource = { workspaceId, sourceMessageId: 'task-dm-source' };
   await rejected(outsider.suggest(channelSource), 'permission-denied');
   await rejected(owner.suggest(dmSource), 'permission-denied');
-  await rejected(unverified.suggest(channelSource), 'permission-denied');
+  await rejected(nonMember.suggest(channelSource), 'permission-denied');
   await rejected(member.suggest({ ...dmSource, arbitrary: true }), 'invalid-argument');
   await rejected(owner.suggest({ workspaceId, sourceMessageId: 'task-foreign-source' }), 'permission-denied');
   const suggestion = (await member.suggest(dmSource)).data;
@@ -182,7 +182,7 @@ try {
   const channelResponse = { taskId: channelTaskId, action: 'accept' };
   await rejected(owner.respond(channelResponse), 'permission-denied');
   await rejected(outsider.respond(channelResponse), 'permission-denied');
-  await rejected(unverified.respond(channelResponse), 'permission-denied');
+  await rejected(nonMember.respond(channelResponse), 'permission-denied');
   await rejected(assignee.respond({ ...channelResponse, status: 'DONE' }), 'invalid-argument');
   await rejected(assignee.respond({ taskId: channelTaskId, action: 'proposeDueDate', proposedDueDate: 'tomorrow' }), 'invalid-argument');
   const laterDue = new Date(Date.now() + 2 * 86400000).toISOString();
