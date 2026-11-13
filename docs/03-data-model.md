@@ -1,6 +1,6 @@
-# 데이터 모델 초안
+# 데이터 모델
 
-> 8일차에 워크스페이스·초대·멤버십 경로와 읽기 권한을 구현했고, 12일차에 서버 전용 메시지 저장 필드를 구현했다. 업무 필드는 후속 일차에서 확정한다. 확인된 사용자의 최초 워크스페이스 생성 3문서 일괄 쓰기만 클라이언트에서 허용하고 나머지 쓰기는 차단한다.
+> 8일차에 워크스페이스·초대·멤버십 경로와 읽기 권한을 구현했고, 12일차에 서버 전용 메시지 저장 필드를 구현했다. 17일차에 업무 생성 문서와 서버 검증을 구현했다. 확인된 사용자의 최초 워크스페이스 생성 3문서 일괄 쓰기만 클라이언트에서 허용하고 나머지 쓰기는 차단한다.
 
 - `workspaces/{workspaceId}`: name, ownerId, createdAt. 클라이언트가 생성할 때 장 멤버십과 본인 목록 미러를 같은 일괄 쓰기로 생성해야 한다.
 - `workspaces/{workspaceId}/members/{uid}`: uid, email, role(owner/member), joinedAt. 문서 ID를 Firebase UID로 고정한다.
@@ -9,18 +9,25 @@
 - `channels/{channelId}`: workspaceId, name. 8일차 규칙은 워크스페이스 전체 공개 채널만 지원한다.
 - `dmRooms/{roomId}`: workspaceId, participantIds
 - `messages/{messageId}`: workspaceId, sourceType(channel/dm), channelId 또는 dmRoomId, senderId, clientMessageId, content, createdAt. 서버가 사용자 UID와 `clientMessageId`로 결정한 ID에 트랜잭션으로 한 번만 생성한다. `createdAt`은 소켓 서버가 생성한 Firestore Timestamp다. 같은 사용자의 클라이언트 ID는 룸과 워크스페이스를 통틀어 고유해야 한다.
-- `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType, title, requesterId, assigneeId, dueDate, proposedDueDate, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewDeadlineAt, completionReason
+- `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType(channel/dm), title, requesterId, assigneeId, dueDate, proposedDueDate, estimatedMinutes, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewDeadlineAt, completionReason, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp이며, 미확정 값은 null이다. 타입 계약은 `shared/contracts/src/task.ts`에 둔다.
 - `taskEvents/{eventId}`: taskId, actorId, action, createdAt, metadata
 - `notifications/{id}`: recipientId, taskId, reviewCycle, type, scheduledAt, sentAt
 - `meetings/{id}`: workspaceId, title, startsAt, endsAt
 
 메시지 내역은 `workspaceId`·`sourceType`·`channelId` 또는 `dmRoomId`로 룸을 제한하고, `createdAt`과 문서 ID의 내림차순으로 30개씩 조회한다. 동시각 메시지도 문서 ID로 정렬이 고정된다. 필요한 채널·DM 복합 인덱스는 `firestore.indexes.json`에 정의한다. 클라이언트의 직접 쓰기 금지와 룸별 읽기 권한은 Firestore 규칙에서 유지한다.
 
+## 업무 생성 스키마 (17일차)
+
+- `createTask` 호출은 `workspaceId`, `sourceMessageId`, `title`, `assigneeId`, 미래의 UTC ISO `dueDate`, `reviewRequired`를 받는다. `reviewWorkingDays`(검수 선택 시 1~10)와 `estimatedMinutes`(선택 시 15분 단위 15~480분)는 선택값이다.
+- 서버는 확인된 로그인 사용자와 담당자가 워크스페이스 멤버인지 확인한다. 원본 메시지의 워크스페이스와 채널·DM 소속을 다시 읽고, DM이면 요청자가 참여자인지 확인한다. 클라이언트가 보낸 요청자·상태 등 정의되지 않은 필드는 거부한다.
+- 서버가 `requesterId`를 로그인 UID로, `sourceType`을 원본 메시지로부터 정한다. 생성 상태는 `REQUESTED`, 검수 회차는 `0`이며 제안 마감·검수 기한·완료 사유는 null이다. 업무 문서에는 DM 본문이나 DM 룸 ID를 복사하지 않는다.
+- 팀 멤버는 업무 제목·담당·마감·상태 등 공개 메타데이터를 읽는다. `sourceMessageId`만으로 원본 DM의 읽기 권한이 생기지 않는다. 생성 UI와 업무 편집·상태 전이는 18일차 이후에 연결한다.
+
 ## 권한
 - 워크스페이스 장만 초대를 발송·철회·조회한다. 초대 수락은 서버 트랜잭션에서 로그인 이메일 확인 여부·초대 이메일 일치·토큰 해시·만료·사용 여부·멤버십 중복을 검증하고 멤버십·목록 미러·초대 상태를 한 번에 기록한다. 초대 기한은 7일이다.
 - 워크스페이스 생성은 초대 메일과 독립적이다. Firestore 규칙은 인증된 이메일·생성자 UID·장 역할·필드 구성·서버 타임스탬프를 검증하고 3문서 일괄 쓰기가 누락되면 거부한다.
 - 워크스페이스·채널·업무 접근은 인증만으로 허용하지 않고 해당 워크스페이스 멤버십을 확인한다.
-- 채널·DM·메시지·업무·일정·알림의 클라이언트 생성/수정/삭제는 후속 서버 로직이 생길 때까지 금지한다. Firestore 규칙은 Admin SDK 쓰기에 적용되지 않으므로 서버 함수가 역할과 필드를 검증한다.
+- 채널·DM·메시지·업무·일정·알림의 클라이언트 직접 생성/수정/삭제는 금지한다. 메시지는 소켓 서버가, 업무 생성은 `createTask` 함수가 검증해 기록한다. Firestore 규칙은 Admin SDK 쓰기에 적용되지 않으므로 서버가 역할과 필드를 검증한다.
 - 팀 전체: 업무 공개 메타데이터만 읽기.
 - DM 메시지: 참여자만 읽기.
 - 메시지 쓰기: 인증된 서버 전용.

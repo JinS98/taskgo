@@ -6,12 +6,18 @@ import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 import nodemailer from 'nodemailer';
+import { createTaskRecord } from './taskModel.js';
 
 initializeApp();
 const db = getFirestore();
 const region = 'asia-northeast3';
 const smtpUrl = defineSecret('INVITE_SMTP_URL');
 const inviteLifetimeMs = 7 * 24 * 60 * 60 * 1000;
+
+export const createTask = onCall({ region }, async (request) => {
+  const user = await verifiedUser(request);
+  return createTaskRecord(db, user.uid, request.data);
+});
 
 function field(data: unknown, key: string): string {
   const value = data && typeof data === 'object' ? (data as Record<string, unknown>)[key] : undefined;

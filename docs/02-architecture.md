@@ -24,7 +24,7 @@ Cloud Functions (워크스페이스·초대) + Scheduler (검수/알림/AI 예�
 
 ## 코드 경계 (2일차 구조)
 - `apps/web/src/features/`: 인증·워크스페이스·채팅·업무·캘린더 기능별 UI와 로직. 공용 UI는 `components/`, 재사용 훅은 `hooks/`에 둔다.
-- `apps/web/src/types/domain.ts`: 화면·상태 관리에 필요한 공통 ID·역할·뷰 이름을 정의한다. 워크스페이스·초대 스키마와 읽기 규칙은 8일차에 구현했고 채팅·업무 필드는 후속 일차에 확정한다.
+- `apps/web/src/types/domain.ts`: 화면·상태 관리에 필요한 공통 ID·역할·뷰 이름을 정의한다. 워크스페이스·초대 스키마와 읽기 규칙은 8일차에 구현했고, 채팅 메시지와 업무 문서 필드는 12·17일차에 각각 확정했다. 공유 업무 타입은 `shared/contracts/src/task.ts`에 둔다.
 - `apps/web/src/config/env.ts`: Vite 클라이언트 설정을 읽는다. Firebase 설정이 없으면 인증 화면 대신 누락된 변수 안내를 표시한다.
 - `apps/web/src/services/firebase.ts`는 Firebase Auth·Firestore·Functions를 초기화하고 명시적 설정에서만 에뮬레이터에 연결한다. `functions/src/index.ts`는 서버 권한을 검증한다. 웹 채팅은 Firebase ID 토큰으로 Socket.IO에 연결하고 채널·DM 목록은 Firestore에서 구독한다. Zustand는 룸별 메시지와 초안을 보관하며 로그아웃 시 초기화한다.
 - `shared/contracts/`는 웹과 소켓 서버 사이의 이벤트 타입 계약이다. `apps/socket-server/`는 HTTP 헬스체크, 소켓 연결, Firebase Admin 토큰 검증과 워크스페이스·채널·DM 접근 검사, 트랜잭션 메시지 저장과 권한별 전파를 수행한다. 기본 `전체` 채널은 멤버의 첫 입장 시 서버가 생성한다. Origin 제한은 인증을 대신하지 않는다. 토큰 만료 시 연결을 종료하고 룸 참가·메시지 요청마다 현재 멤버십을 확인한다. 소켓 룸 전파는 현재 단일 서버 인스턴스만 지원한다. 웹은 룸별 Firestore 쿼리로 최근 메시지를 읽고 문서 커서로 이전 페이지를 불러온다. 재연결 시 서버에서 최신 내역부터 이미 확인한 메시지까지 페이지를 읽어 합치며, 조회 중 재연결이 겹치면 완료 후 다시 조회한다.
