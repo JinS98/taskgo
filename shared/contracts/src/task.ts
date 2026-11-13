@@ -7,6 +7,7 @@ export interface CreateTaskRequest {
   sourceMessageId: string;
   title: string;
   description?: string | null;
+  requesterId?: string;
   assigneeId: string;
   dueDate: string; // UTC ISO timestamp.
   reviewRequired: boolean;
@@ -47,6 +48,7 @@ export interface TaskRecord<TimestampValue> {
   title: string;
   description?: string | null;
   requesterId: string;
+  createdById?: string;
   assigneeId: string;
   dueDate: TimestampValue;
   proposedDueDate: TimestampValue | null;

@@ -28,19 +28,21 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [requesterId, setRequesterId] = useState(viewerId);
   const [assigneeId, setAssigneeId] = useState('');
   const [dueLocal, setDueLocal] = useState('');
   const [estimatedMinutes, setEstimatedMinutes] = useState('');
-  const [reviewRequired, setReviewRequired] = useState(false);
-  const [reviewDays, setReviewDays] = useState('2');
+  const [reviewDays, setReviewDays] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [suggestionPending, setSuggestionPending] = useState(false);
   const [suggestionError, setSuggestionError] = useState('');
   const [suggestions, setSuggestions] = useState<TaskSuggestionResult | null>(null);
-  const assignees = Object.keys(memberEmails).sort((a, b) => (memberNames[a] || a).localeCompare(memberNames[b] || b));
+  const assignees = Array.from(new Set([...Object.keys(memberEmails), viewerId])).sort((a, b) => (memberNames[a] || a).localeCompare(memberNames[b] || b));
   const assigneeName = (uid: string) => memberNames[uid] || `팀원-${uid.slice(0, 4).toUpperCase()}`;
+  const memberOption = (uid: string) => `${assigneeName(uid)}${uid === viewerId ? ' (나)' : ''}${assignees.some((other) => other !== uid && assigneeName(other) === assigneeName(uid)) ? ` · ${uid.slice(0, 4).toUpperCase()}` : ''}`;
   const selfAssigned = assigneeId === viewerId;
+  const reviewRequired = reviewDays !== '';
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -68,8 +70,9 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     const trimmedTitle = title.trim();
     const dueMillis = Date.parse(dueLocal);
     if (trimmedTitle.length < 2 || trimmedTitle.length > 160) { setError('업무 제목은 2~160자로 입력해 주세요.'); return; }
-    if (!Number.isFinite(dueMillis) || dueMillis <= Date.now()) { setError('미래의 마감 날짜와 시간을 선택해 주세요.'); return; }
-    if (!memberEmails[assigneeId]) { setError('워크스페이스 멤버를 담당자로 선택해 주세요.'); return; }
+    if (!Number.isFinite(dueMillis) || dueMillis <= new Date().getTime()) { setError('미래의 마감 날짜와 시간을 선택해 주세요.'); return; }
+    if (!assignees.includes(requesterId)) { setError('워크스페이스 멤버를 요청자로 선택해 주세요.'); return; }
+    if (!assignees.includes(assigneeId)) { setError('워크스페이스 멤버를 담당자로 선택해 주세요.'); return; }
     setPending(true);
     setError('');
     const request: CreateTaskRequest = {
@@ -77,6 +80,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
       sourceMessageId,
       title: trimmedTitle,
       description: description.trim() || null,
+      requesterId,
       assigneeId,
       dueDate: new Date(dueMillis).toISOString(),
       estimatedMinutes: estimatedMinutes ? Number(estimatedMinutes) : null,
@@ -93,20 +97,24 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     }
   }
 
-  return <dialog ref={dialogRef} className={styles.dialog} aria-labelledby="task-dialog-title" onCancel={(event) => { event.preventDefault(); if (!pending) onClose(); }}>
+  return <dialog ref={dialogRef} className={styles.dialog} aria-labelledby="task-dialog-title" onCancel={(event) => { event.preventDefault(); if (!pending) onClose(); }} onClick={(event) => {
+    if (pending || event.target !== event.currentTarget) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
+  }}>
     <div className={styles.header}>
-      <div><p className={styles.eyebrow}>MESSAGE TO TASK</p><h2 id="task-dialog-title">업무 요청 만들기</h2></div>
+      <div><p className={styles.eyebrow}>채팅에서 업무로</p><h2 id="task-dialog-title">업무 요청 만들기</h2></div>
       <button type="button" className={styles.close} aria-label="업무 요청 닫기" disabled={pending} onClick={onClose}>×</button>
     </div>
     <div className={styles.scrollArea}>
     <div className={styles.source}>
       <strong>원본 {sourceKind === 'dm' ? 'DM' : '채널'} 메시지</strong>
       <p>{sourceContent}</p>
-      <small>원문은 업무에 복사되지 않습니다. 업무 제목과 담당·마감은 워크스페이스 전체에 공개됩니다.</small>
+      <small>원문은 업무에 복사되지 않습니다. 업무 정보는 워크스페이스 멤버에게 공개됩니다.</small>
     </div>
     <div className={styles.suggestionPanel}>
       <div className={styles.suggestionIntro}>
-        <div><strong>업무 제목 초안</strong><p>선택한 메시지의 대화 문맥을 참고해 초안을 만듭니다. 선택 후 제목을 수정할 수 있습니다.</p><p>AI가 설정된 경우 같은 채널·DM의 메시지 최대 8개가 OpenAI API로 전송됩니다.</p></div>
+        <div><strong>제목 초안</strong><p>대화 내용을 참고해 제목을 제안합니다. 필요하면 직접 수정하세요.</p><p>AI가 설정된 경우 같은 대화의 메시지 최대 8개가 OpenAI API로 전송됩니다.</p></div>
         <button type="button" disabled={suggestionPending || pending} onClick={() => void requestSuggestions()}>{suggestionPending ? '만드는 중…' : '초안 제안받기'}</button>
       </div>
       {suggestionError && <p className={styles.error} role="alert">{suggestionError}</p>}
@@ -119,18 +127,15 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
       </div>}
     </div>
     <form id="task-create-form" className={styles.form} onSubmit={(event) => void submit(event)}>
-      <label className={styles.field}>업무 제목<input ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required placeholder="팀에 공개할 업무 제목" /></label>
-      <div className={styles.row}>
-        <label className={styles.field}>담당자<select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required><option value="">담당자를 선택하세요</option>{assignees.map((uid) => <option key={uid} value={uid}>{assigneeName(uid)}{assignees.some((other) => other !== uid && assigneeName(other) === assigneeName(uid)) ? ` · ${uid.slice(0, 4).toUpperCase()}` : ''}</option>)}</select></label>
-        <label className={styles.field}>마감 날짜·시간<input type="datetime-local" value={dueLocal} onChange={(event) => setDueLocal(event.target.value)} min={localDateTime(new Date())} required /></label>
-      </div>
-      {selfAssigned && <p className={styles.selfAssignedHint}>본인을 담당자로 선택하면 수락 상태로 바로 시작합니다.</p>}
-      <label className={styles.field}>설명<textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={3} placeholder="업무에 필요한 내용을 적어 주세요" /></label>
-      <label className={`${styles.field} ${styles.estimateField}`}>예상 작업 시간<select value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">선택 안 함</option>{estimateOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes}분` : `${minutes / 60}시간`}</option>)}</select></label>
-      <div className={styles.reviewSection}>
-        <label className={styles.check}><input type="checkbox" aria-label="완료 후 검수 요청" checked={reviewRequired} onChange={(event) => setReviewRequired(event.target.checked)} /><span><strong>완료 후 검수 요청</strong><small>업무가 완료되면 검수자에게 확인을 요청합니다.</small></span></label>
-        <div className={styles.reviewOption}>{reviewRequired ? <label className={styles.field}>검수 기간<select value={reviewDays} onChange={(event) => setReviewDays(event.target.value)}>{Array.from({ length: 10 }, (_, index) => index + 1).map((days) => <option key={days} value={days}>{days}근무일</option>)}</select></label> : <span className={styles.reviewHint}>필요한 경우 검수 기간을 선택할 수 있습니다.</span>}</div>
-      </div>
+      <label className={styles.field}><span>업무 제목</span><input ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required placeholder="업무 제목을 입력하세요" /></label>
+      <label className={styles.field}><span>요청자</span><select value={requesterId} onChange={(event) => setRequesterId(event.target.value)} required>{assignees.map((uid) => <option key={uid} value={uid}>{memberOption(uid)}</option>)}</select></label>
+      {requesterId !== viewerId && <p className={styles.fieldHint}>선택한 요청자가 마감 변경과 검수를 확인합니다. 실제 생성자는 이력에 남습니다.</p>}
+      <label className={styles.field}><span>담당자</span><select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required><option value="">담당자를 선택하세요</option>{assignees.map((uid) => <option key={uid} value={uid}>{memberOption(uid)}</option>)}</select></label>
+      {selfAssigned && <p className={styles.fieldHint}>본인을 담당자로 선택하면 수락 상태로 바로 시작합니다.</p>}
+      <label className={styles.field}><span>마감 날짜·시간</span><input type="datetime-local" value={dueLocal} onChange={(event) => setDueLocal(event.target.value)} min={localDateTime(new Date())} required /></label>
+      <label className={`${styles.field} ${styles.descriptionField}`}><span>설명</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={3} placeholder="업무에 필요한 내용을 적어 주세요" /></label>
+      <label className={styles.field}><span>예상 작업 시간</span><select value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">선택 안 함</option>{estimateOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes}분` : `${minutes / 60}시간`}</option>)}</select></label>
+      <label className={styles.field}><span>완료 후 검수</span><select value={reviewDays} onChange={(event) => setReviewDays(event.target.value)}><option value="">선택 안 함</option>{Array.from({ length: 10 }, (_, index) => index + 1).map((days) => <option key={days} value={days}>{days}근무일</option>)}</select></label>
     </form>
     </div>
     <div className={styles.footer}>

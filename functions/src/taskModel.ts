@@ -4,7 +4,7 @@ import type { CreateTaskRequest, TaskRecord, TaskSourceType } from '@taskgo/cont
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const requiredFields = ['workspaceId', 'sourceMessageId', 'title', 'assigneeId', 'dueDate', 'reviewRequired'];
-const allowedFields = new Set([...requiredFields, 'reviewWorkingDays', 'estimatedMinutes', 'description']);
+const allowedFields = new Set([...requiredFields, 'requesterId', 'reviewWorkingDays', 'estimatedMinutes', 'description']);
 
 function parseCreateTaskRequest(value: unknown): CreateTaskRequest & { due: Timestamp; reviewDays: number | null; estimate: number | null; description: string | null } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HttpsError('invalid-argument', '업무 정보를 확인해 주세요.');
@@ -14,6 +14,9 @@ function parseCreateTaskRequest(value: unknown): CreateTaskRequest & { due: Time
   }
   for (const key of ['workspaceId', 'sourceMessageId', 'assigneeId']) {
     if (typeof data[key] !== 'string' || !idPattern.test(data[key])) throw new HttpsError('invalid-argument', `${key} 값을 확인해 주세요.`);
+  }
+  if (data.requesterId !== undefined && (typeof data.requesterId !== 'string' || !idPattern.test(data.requesterId))) {
+    throw new HttpsError('invalid-argument', '요청자를 확인해 주세요.');
   }
   if (typeof data.title !== 'string' || data.title.trim().length < 2 || data.title.trim().length > 160) {
     throw new HttpsError('invalid-argument', '업무 제목은 2~160자로 입력해 주세요.');
@@ -43,6 +46,7 @@ function parseCreateTaskRequest(value: unknown): CreateTaskRequest & { due: Time
     sourceMessageId: data.sourceMessageId as string,
     title: (data.title as string).trim(),
     description: typeof description === 'string' ? description.trim() || null : null,
+    requesterId: data.requesterId as string | undefined,
     assigneeId: data.assigneeId as string,
     dueDate: data.dueDate,
     reviewRequired: data.reviewRequired,
@@ -54,20 +58,23 @@ function parseCreateTaskRequest(value: unknown): CreateTaskRequest & { due: Time
   };
 }
 
-export async function createTaskRecord(db: Firestore, requesterId: string, value: unknown): Promise<{ taskId: string }> {
+export async function createTaskRecord(db: Firestore, creatorId: string, value: unknown): Promise<{ taskId: string }> {
   const input = parseCreateTaskRequest(value);
+  const requesterId = input.requesterId ?? creatorId;
+  const creatorRef = db.doc(`workspaces/${input.workspaceId}/members/${creatorId}`);
   const requesterRef = db.doc(`workspaces/${input.workspaceId}/members/${requesterId}`);
   const assigneeRef = db.doc(`workspaces/${input.workspaceId}/members/${input.assigneeId}`);
   const messageRef = db.doc(`messages/${input.sourceMessageId}`);
   const taskRef = db.collection('tasks').doc();
 
   return db.runTransaction(async (transaction) => {
-    const [requester, assignee, message] = await Promise.all([
-      transaction.get(requesterRef), transaction.get(assigneeRef), transaction.get(messageRef),
+    const [creator, requester, assignee, message] = await Promise.all([
+      transaction.get(creatorRef), transaction.get(requesterRef), transaction.get(assigneeRef), transaction.get(messageRef),
     ]);
-    if (!requester.exists || !message.exists || message.get('workspaceId') !== input.workspaceId) {
+    if (!creator.exists || !message.exists || message.get('workspaceId') !== input.workspaceId) {
       throw new HttpsError('permission-denied', '이 워크스페이스의 원본 메시지에 접근할 수 없습니다.');
     }
+    if (!requester.exists) throw new HttpsError('failed-precondition', '요청자가 워크스페이스 멤버가 아닙니다.');
     if (!assignee.exists) throw new HttpsError('failed-precondition', '담당자가 워크스페이스 멤버가 아닙니다.');
     const sourceType = message.get('sourceType');
     if (sourceType !== 'channel' && sourceType !== 'dm') throw new HttpsError('failed-precondition', '원본 메시지 종류를 확인할 수 없습니다.');
@@ -75,12 +82,12 @@ export async function createTaskRecord(db: Firestore, requesterId: string, value
     if (typeof roomId !== 'string' || !idPattern.test(roomId)) throw new HttpsError('failed-precondition', '원본 대화방을 확인할 수 없습니다.');
     const room = await transaction.get(db.doc(`${sourceType === 'channel' ? 'channels' : 'dmRooms'}/${roomId}`));
     if (!room.exists || room.get('workspaceId') !== input.workspaceId
-      || (sourceType === 'dm' && (!Array.isArray(room.get('participantIds')) || !room.get('participantIds').includes(requesterId)))) {
+      || (sourceType === 'dm' && (!Array.isArray(room.get('participantIds')) || !room.get('participantIds').includes(creatorId)))) {
       throw new HttpsError('permission-denied', '원본 대화방에 접근할 수 없습니다.');
     }
 
     const now = Timestamp.now();
-    const selfAssigned = input.assigneeId === requesterId;
+    const selfAssigned = input.assigneeId === creatorId;
     const task: TaskRecord<Timestamp> = {
       workspaceId: input.workspaceId,
       sourceMessageId: input.sourceMessageId,
@@ -88,6 +95,7 @@ export async function createTaskRecord(db: Firestore, requesterId: string, value
       title: input.title,
       description: input.description,
       requesterId,
+      createdById: creatorId,
       assigneeId: input.assigneeId,
       dueDate: input.due,
       proposedDueDate: null,
@@ -107,7 +115,7 @@ export async function createTaskRecord(db: Firestore, requesterId: string, value
     if (selfAssigned) {
       transaction.create(db.collection('taskEvents').doc(), {
         taskId: taskRef.id,
-        actorId: requesterId,
+        actorId: creatorId,
         action: 'accept',
         createdAt: now,
         metadata: { automatic: true },

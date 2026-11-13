@@ -146,12 +146,21 @@ try {
   await ownerPage.getByRole('dialog', { name: '업무 요청 만들기' }).waitFor({ state: 'hidden' });
   assert.equal((await db.collection('tasks').get()).size, 0, 'Closing the draft must not create a task.');
   await channelSource.getByRole('button', { name: '업무 요청' }).click();
+  await ownerPage.mouse.click(5, 5);
+  await ownerPage.getByRole('dialog', { name: '업무 요청 만들기' }).waitFor({ state: 'hidden' });
+  assert.equal((await db.collection('tasks').get()).size, 0, 'Clicking outside the dialog must not create a task.');
+  await channelSource.getByRole('button', { name: '업무 요청' }).click();
   let taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
   if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-modal.png') });
   const dialogBounds = await taskDialog.boundingBox();
   const submitBounds = await taskDialog.getByRole('button', { name: '업무 요청 저장' }).boundingBox();
   assert.ok(dialogBounds && submitBounds && submitBounds.y + submitBounds.height <= dialogBounds.y + dialogBounds.height - 4, 'Task submit action must remain visible in a short dialog.');
   assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), '');
+  assert.equal(await taskDialog.getByLabel('요청자').inputValue(), owner.uid);
+  await taskDialog.getByLabel('요청자').selectOption(member.uid);
+  assert.equal(await taskDialog.getByLabel('요청자').inputValue(), member.uid);
+  await taskDialog.getByLabel('요청자').selectOption(owner.uid);
+  assert.equal(await taskDialog.getByLabel('완료 후 검수').inputValue(), '');
   assert.equal(await taskDialog.getByText('로컬 문장 기반 초안입니다. AI 생성 결과는 아닙니다.').count(), 0);
   await taskDialog.getByRole('button', { name: '초안 제안받기' }).click();
   await taskDialog.getByText('로컬 문장 기반 초안입니다. AI 생성 결과는 아닙니다.').waitFor();
@@ -187,11 +196,11 @@ try {
   assert.equal(channelTasks.docs[0].get('reviewRequired'), false);
 
   await ownerPage.getByRole('button', { name: '캘린더' }).click();
-  const requestedEvent = ownerPage.getByLabel('고객 요청 정리, 요청 대기');
+  const requestedEvent = ownerPage.getByTitle(/^고객 요청 정리 ·/).first();
   await requestedEvent.waitFor();
   assert.equal(await requestedEvent.evaluate((element) => getComputedStyle(element).borderTopStyle), 'dashed');
   await ownerPage.getByRole('button', { name: '내 담당 업무' }).click();
-  assert.equal(await ownerPage.getByLabel('고객 요청 정리, 요청 대기').count(), 0);
+  assert.equal(await ownerPage.getByTitle(/^고객 요청 정리 ·/).count(), 0);
   await ownerPage.getByRole('button', { name: '팀 전체 일정' }).click();
   await requestedEvent.waitFor();
   if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-calendar.png') });
@@ -239,7 +248,7 @@ try {
   await memberTaskCard.getByText('업무 진행 시작', { exact: true }).waitFor();
   assert.equal(await memberTaskCard.getByText('마감 변경 승인', { exact: true }).count(), 2);
   await ownerPage.getByRole('button', { name: '캘린더' }).click();
-  const acceptedEvent = ownerPage.getByLabel('고객 요청 정리, 확정 업무');
+  const acceptedEvent = ownerPage.getByTitle(/^고객 요청 정리 ·/).first();
   await acceptedEvent.waitFor();
   assert.equal(await acceptedEvent.evaluate((element) => getComputedStyle(element).borderTopStyle), 'solid');
   await ownerPage.getByRole('button', { name: '채팅' }).click();
@@ -293,8 +302,7 @@ try {
   await taskDialog.getByLabel('업무 제목').fill('비공개 대화 후속 업무');
   await taskDialog.getByLabel('담당자').selectOption({ label: member.displayName });
   await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
-  await taskDialog.getByLabel('완료 후 검수 요청').check();
-  await taskDialog.getByLabel('검수 기간').selectOption('2');
+  await taskDialog.getByLabel('완료 후 검수').selectOption('2');
   await taskDialog.getByRole('button', { name: '업무 요청 저장' }).click();
   await ownerPage.getByText('업무 요청이 저장되었습니다.').waitFor();
   const dmTask = (await db.collection('tasks').where('sourceMessageId', '==', 'history-dm').get()).docs[0];
@@ -313,8 +321,7 @@ try {
   await taskDialog.getByLabel('업무 제목').fill('검수 요청 업무');
   await taskDialog.getByLabel('담당자').selectOption({ label: member.displayName });
   await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
-  await taskDialog.getByLabel('완료 후 검수 요청').check();
-  await taskDialog.getByLabel('검수 기간').selectOption('2');
+  await taskDialog.getByLabel('완료 후 검수').selectOption('2');
   await taskDialog.getByRole('button', { name: '업무 요청 저장' }).click();
   const reviewTaskCard = memberPage.getByRole('article').filter({ hasText: '검수 요청 업무' });
   await reviewTaskCard.getByRole('button', { name: '수락', exact: true }).click();
@@ -372,8 +379,31 @@ try {
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await visibleOnce(ownerPage, 'offline gap 34');
   assert.ok((await db.collection('messages').get()).size >= 70);
+
+  const calendarNow = Timestamp.now();
+  const calendarDue = Timestamp.fromMillis(calendarNow.toMillis() + 2 * 86400000);
+  const calendarBatch = db.batch();
+  for (let index = 0; index < 6; index += 1) {
+    calendarBatch.set(db.doc(`tasks/calendar-crowded-${index}`), {
+      workspaceId, title: `캘린더 혼잡 ${index + 1}`, status: 'ACCEPTED',
+      requesterId: owner.uid, assigneeId: member.uid, reviewRequired: false,
+      createdAt: calendarNow, dueDate: calendarDue,
+    });
+  }
+  await calendarBatch.commit();
+  await ownerPage.getByRole('button', { name: '캘린더' }).click();
+  const todayParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(calendarNow.toDate());
+  const part = (type) => Number(todayParts.find((entry) => entry.type === type).value);
+  const dayCell = ownerPage.getByRole('gridcell', { name: new RegExp(`${part('year')}년 ${part('month')}월 ${part('day')}일`) });
+  await dayCell.getByRole('button', { name: /업무 \d+개 모두 보기/ }).click();
+  const dayDialog = ownerPage.getByRole('dialog', { name: `${part('month')}월 ${part('day')}일` });
+  await dayDialog.waitFor();
+  if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-calendar-more.png') });
+  for (let index = 0; index < 6; index += 1) await dayDialog.getByText(`캘린더 혼잡 ${index + 1}`, { exact: true }).waitFor();
+  await ownerPage.keyboard.press('Escape');
+  await dayDialog.waitFor({ state: 'hidden' });
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions verified task progress, review rejection and resubmission, approval, no-review completion, and live messages.');
+  console.log('PASS: two Chrome sessions verified task progress, review, live messages, and calendar overflow.');
 } finally {
   await browser?.close();
   await vite?.close();

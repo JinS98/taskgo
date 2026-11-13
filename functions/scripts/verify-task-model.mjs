@@ -71,7 +71,8 @@ try {
   const input = { workspaceId, sourceMessageId: 'task-channel-source', title: '  모델 검증 업무  ', description: '  검토 메모  ', assigneeId: assignee.user.uid, dueDate, reviewRequired: false };
   await rejected(outsider.create(input), 'permission-denied');
   await rejected(nonMember.create(input), 'permission-denied');
-  await rejected(owner.create({ ...input, requesterId: outsider.user.uid }), 'invalid-argument');
+  await rejected(owner.create({ ...input, requesterId: outsider.user.uid }), 'failed-precondition');
+  await rejected(owner.create({ ...input, requesterId: 'bad/id' }), 'invalid-argument');
   await rejected(owner.create({ ...input, status: 'DONE' }), 'invalid-argument');
   await rejected(owner.create({ ...input, assigneeId: outsider.user.uid }), 'failed-precondition');
   await rejected(owner.create({ ...input, dueDate: new Date(Date.now() - 60000).toISOString() }), 'invalid-argument');
@@ -86,6 +87,7 @@ try {
   const channelTaskId = (await owner.create(input)).data.taskId;
   const channelTask = await adminDb.doc(`tasks/${channelTaskId}`).get();
   assert.equal(channelTask.get('requesterId'), owner.user.uid);
+  assert.equal(channelTask.get('createdById'), owner.user.uid);
   assert.equal(channelTask.get('assigneeId'), assignee.user.uid);
   assert.equal(channelTask.get('title'), '모델 검증 업무');
   assert.equal(channelTask.get('description'), '검토 메모');
@@ -351,7 +353,35 @@ try {
   await member.respond({ taskId: selfTaskId, action: 'startProgress' });
   assert.equal((await adminDb.doc(`tasks/${selfTaskId}`).get()).get('status'), 'IN_PROGRESS');
 
-  console.log('PASS: task schema, self-assignment auto-acceptance, permissions, progress, review, completion, and history.');
+  const delegatedId = (await owner.create({ ...input, title: '다른 요청자 업무', requesterId: member.user.uid })).data.taskId;
+  const delegated = await adminDb.doc(`tasks/${delegatedId}`).get();
+  assert.equal(delegated.get('createdById'), owner.user.uid);
+  assert.equal(delegated.get('requesterId'), member.user.uid);
+  assert.equal(delegated.get('status'), 'REQUESTED');
+
+  const privateDelegatedId = (await member.create({
+    ...input, sourceMessageId: 'task-dm-source', title: 'DM 요청자 지정', requesterId: owner.user.uid,
+  })).data.taskId;
+  const privateDelegated = await adminDb.doc(`tasks/${privateDelegatedId}`).get();
+  assert.equal(privateDelegated.get('sourceType'), 'dm');
+  assert.equal(privateDelegated.get('createdById'), member.user.uid);
+  assert.equal(privateDelegated.get('requesterId'), owner.user.uid);
+  assert.equal('dmRoomId' in privateDelegated.data(), false);
+  await assert.rejects(getDoc(doc(owner.db, 'messages', 'task-dm-source')), (error) => error.code === 'permission-denied');
+
+  const selfDelegatedId = (await owner.create({
+    ...input, title: '요청자를 지정한 본인 담당 업무', requesterId: member.user.uid, assigneeId: owner.user.uid,
+  })).data.taskId;
+  const selfDelegated = await adminDb.doc(`tasks/${selfDelegatedId}`).get();
+  assert.equal(selfDelegated.get('requesterId'), member.user.uid);
+  assert.equal(selfDelegated.get('createdById'), owner.user.uid);
+  assert.equal(selfDelegated.get('status'), 'ACCEPTED');
+  const selfDelegatedEvents = await getDocs(query(collection(owner.db, 'taskEvents'), where('taskId', '==', selfDelegatedId)));
+  assert.equal(selfDelegatedEvents.size, 1);
+  assert.equal(selfDelegatedEvents.docs[0].get('actorId'), owner.user.uid);
+  assert.equal(selfDelegatedEvents.docs[0].get('metadata.automatic'), true);
+
+  console.log('PASS: requester selection, creator attribution, self-assignment, permissions, progress, review, completion, and history.');
 } finally {
   for (const app of apps) await deleteApp(app);
   await deleteAdminApp(admin);
