@@ -121,9 +121,10 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
         <label className={styles.field}>마감 날짜·시간<input type="datetime-local" value={dueLocal} onChange={(event) => setDueLocal(event.target.value)} min={localDateTime(new Date())} required /></label>
       </div>
       <label className={styles.field}>설명<textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={3} placeholder="업무에 필요한 내용을 적어 주세요" /></label>
-      <div className={styles.row}>
-        <label className={styles.field}>예상 작업 시간<select value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">선택 안 함</option>{estimateOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes}분` : `${minutes / 60}시간`}</option>)}</select></label>
-        <div className={styles.review}><label className={styles.check}><input type="checkbox" checked={reviewRequired} onChange={(event) => setReviewRequired(event.target.checked)} />완료 후 검수 요청</label>{reviewRequired && <label className={styles.field}>검수 기간<select value={reviewDays} onChange={(event) => setReviewDays(event.target.value)}>{Array.from({ length: 10 }, (_, index) => index + 1).map((days) => <option key={days} value={days}>{days}근무일</option>)}</select></label>}</div>
+      <label className={`${styles.field} ${styles.estimateField}`}>예상 작업 시간<select value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">선택 안 함</option>{estimateOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes}분` : `${minutes / 60}시간`}</option>)}</select></label>
+      <div className={styles.reviewSection}>
+        <label className={styles.check}><input type="checkbox" aria-label="완료 후 검수 요청" checked={reviewRequired} onChange={(event) => setReviewRequired(event.target.checked)} /><span><strong>완료 후 검수 요청</strong><small>업무가 완료되면 검수자에게 확인을 요청합니다.</small></span></label>
+        <div className={styles.reviewOption}>{reviewRequired ? <label className={styles.field}>검수 기간<select value={reviewDays} onChange={(event) => setReviewDays(event.target.value)}>{Array.from({ length: 10 }, (_, index) => index + 1).map((days) => <option key={days} value={days}>{days}근무일</option>)}</select></label> : <span className={styles.reviewHint}>필요한 경우 검수 기간을 선택할 수 있습니다.</span>}</div>
       </div>
     </form>
     </div>

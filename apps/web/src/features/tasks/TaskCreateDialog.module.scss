@@ -33,9 +33,12 @@
 .field textarea { min-height:78px; resize:vertical; line-height:1.5; }
 .field input:focus,.field select:focus,.field textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px #5849c818; }
 .field input::placeholder,.field textarea::placeholder { color:#a1aaba; }
-.review { display:grid; align-content:start; gap:7px; }
-.check { display:flex; align-items:center; gap:7px; min-height:39px; color:#526075; cursor:pointer; font-size:11px; font-weight:700; }
-.check input { width:16px; height:16px; margin:0; accent-color:var(--accent); }
+.estimateField { max-width:calc(50% - 6px); }
+.reviewSection { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center; gap:12px; min-height:83px; padding:12px 14px; border:1px solid #e3e5ee; border-radius:9px; background:#f8f9fc; }
+.check { display:flex; align-items:center; gap:10px; min-width:0; color:#526075; cursor:pointer; font-size:11px; font-weight:700; }
+.check input { flex:0 0 16px; width:16px; height:16px; margin:0; accent-color:var(--accent); }
+.check span { display:grid; gap:4px; }.check strong { color:#39465c; font-size:12px; }.check small,.reviewHint { color:#8994a3; font-size:10px; font-weight:500; line-height:1.45; }
+.reviewOption { min-width:0; }.reviewHint { display:block; padding:0 5px; }
 .error { margin:0; padding:10px 12px; border:1px solid #f1d5db; border-radius:7px; background:#fff2f4; color:#9c3e50; font-size:11px; }
 .footer { flex:0 0 auto; border-top:1px solid var(--line); background:#fff; }
 .footer .error { margin:10px 26px 0; }
@@ -45,4 +48,4 @@
 .cancel { border:1px solid #dce1e9; background:#fff; color:#526075; }
 .submit { border:1px solid var(--accent); background:var(--accent); color:#fff; }
 .submit:hover { background:#493ab9; }
-@media (max-width:600px) { .header { padding:19px 18px 15px; } .source { margin:14px 18px 0; } .suggestionPanel { margin:11px 18px 0; } .suggestionIntro { align-items:stretch; flex-direction:column; } .form { padding:17px 18px; } .row { grid-template-columns:1fr; } .footer .error { margin:10px 18px 0; } .actions { padding:10px 18px 12px; } }
+@media (max-width:600px) { .header { padding:19px 18px 15px; } .source { margin:14px 18px 0; } .suggestionPanel { margin:11px 18px 0; } .suggestionIntro { align-items:stretch; flex-direction:column; } .form { padding:17px 18px; } .row { grid-template-columns:1fr; } .estimateField { max-width:none; } .reviewSection { grid-template-columns:1fr; gap:10px; } .reviewHint { padding:0 0 0 26px; } .footer .error { margin:10px 18px 0; } .actions { padding:10px 18px 12px; } }
