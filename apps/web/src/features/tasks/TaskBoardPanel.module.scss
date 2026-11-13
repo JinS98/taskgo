@@ -25,6 +25,9 @@
 .meta { display:flex; flex-wrap:wrap; gap:6px 12px; color:#909baa; font-size:10px; overflow-wrap:anywhere; }
 .proposal { display:flex; flex-wrap:wrap; align-items:center; gap:5px 9px; margin-top:13px; padding:9px 10px; border:1px dashed #c9bff5; border-radius:7px; background:#fbfaff; color:#6455b9; font-size:11px; }
 .proposal small { flex-basis:100%; color:#8b82bd; font-size:10px; line-height:1.5; }
+.reviewInfo { display:grid; gap:4px; margin-top:13px; padding:10px; border:1px solid #d9e7e1; border-radius:7px; background:#f3faf7; color:#2b6959; font-size:11px; line-height:1.45; }
+.reviewInfo strong { font-size:11px; }
+.reviewInfo small { color:#5d8b7d; font-size:10px; }
 .actions { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:14px; }
 .actions button,.proposeForm button { min-height:32px; padding:7px 9px; border:1px solid #dce1e9; border-radius:7px; background:#fff; color:#526075; cursor:pointer; font:inherit; font-size:10px; font-weight:750; }
 .actions button:hover,.proposeForm button:hover { background:#f7f8fb; }

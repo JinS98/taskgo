@@ -77,6 +77,6 @@ export function TaskCalendarPanel({ db, workspaceId, viewerId }: { db: Firestore
       })}
     </div></div>
     <div className={styles.legend}><span>확정된 업무</span><span className={styles.pendingKey}>요청 대기 업무</span></div>
-    {filter === 'review' && <p className={styles.note}>검수 일정은 업무가 검수 단계에 들어가면 추가로 표시됩니다. 현재는 검수가 필요한 업무의 마감일을 보여줍니다.</p>}
+    {filter === 'review' && <p className={styles.note}>현재는 검수가 필요한 업무의 마감일을 표시합니다. 검수 기한은 근무시간 계산 기능과 함께 추가됩니다.</p>}
   </section>;
 }

@@ -96,6 +96,7 @@ try {
   assert.equal(channelTask.get('reviewRequired'), false);
   assert.equal(channelTask.get('reviewWorkingDays'), null);
   assert.equal(channelTask.get('reviewCycle'), 0);
+  assert.equal(channelTask.get('reviewSubmittedAt'), null);
   assert.equal(channelTask.get('reviewDeadlineAt'), null);
   assert.equal(channelTask.get('proposedDueDate'), null);
   assert.equal(channelTask.get('completionReason'), null);
@@ -110,6 +111,7 @@ try {
   assert.equal(dmTask.get('sourceType'), 'dm');
   assert.equal(dmTask.get('reviewRequired'), true);
   assert.equal(dmTask.get('reviewWorkingDays'), 2);
+  assert.equal(dmTask.get('reviewSubmittedAt'), null);
   assert.equal(dmTask.get('estimatedMinutes'), 90);
   assert.equal(dmTask.get('description'), null);
   assert.equal('content' in dmTask.data(), false);
@@ -249,9 +251,41 @@ try {
   const acceptedTask = await adminDb.doc(`tasks/${staleTaskId}`).get();
   assert.equal(acceptedTask.get('status'), 'ACCEPTED');
   assert.equal(acceptedTask.get('dueDate').toDate().toISOString(), progressDue);
-  assert.equal((await adminDb.collection('taskEvents').get()).size, 16);
+  await rejected(assignee.respond({ taskId: channelTaskId, action: 'submitForReview' }), 'failed-precondition');
 
-  console.log('PASS: task schema, permissions, scoped suggestions, OpenAI contract, request and progress transitions, deadline approvals, and history.');
+  const reviewTaskId = (await owner.create({ ...input, title: '검수 요청 검증', reviewRequired: true, reviewWorkingDays: 2 })).data.taskId;
+  const submitReview = { taskId: reviewTaskId, action: 'submitForReview' };
+  await rejected(assignee.respond(submitReview), 'failed-precondition');
+  await rejected(owner.respond(submitReview), 'permission-denied');
+  await rejected(member.respond(submitReview), 'permission-denied');
+  await rejected(assignee.respond({ ...submitReview, reviewCycle: 99 }), 'invalid-argument');
+  await assignee.respond({ taskId: reviewTaskId, action: 'accept' });
+  await rejected(assignee.respond(submitReview), 'failed-precondition');
+  await assignee.respond({ taskId: reviewTaskId, action: 'startProgress' });
+  await assignee.respond({ taskId: reviewTaskId, action: 'proposeDueDate', proposedDueDate: progressDue });
+  await rejected(assignee.respond(submitReview), 'failed-precondition');
+  await owner.respond({ taskId: reviewTaskId, action: 'rejectDueDate' });
+  const submissions = await Promise.allSettled([assignee.respond(submitReview), assignee.respond(submitReview)]);
+  assert.equal(submissions.filter((result) => result.status === 'fulfilled').length, 1);
+  assert.equal(submissions.filter((result) => result.status === 'rejected' && result.reason.code === 'functions/failed-precondition').length, 1);
+  const reviewTask = await adminDb.doc(`tasks/${reviewTaskId}`).get();
+  assert.equal(reviewTask.get('status'), 'REVIEW_PENDING');
+  assert.equal(reviewTask.get('reviewCycle'), 1);
+  assert.ok(reviewTask.get('reviewSubmittedAt') instanceof Timestamp);
+  assert.equal(reviewTask.get('reviewDeadlineAt'), null);
+  assert.equal(reviewTask.get('reviewWorkingDays'), 2);
+  assert.equal(reviewTask.get('proposedDueDate'), null);
+  assert.equal((await getDoc(doc(owner.db, 'tasks', reviewTaskId))).data().status, 'REVIEW_PENDING');
+  await rejected(assignee.respond(submitReview), 'failed-precondition');
+  await rejected(assignee.respond({ taskId: reviewTaskId, action: 'proposeDueDate', proposedDueDate: progressDue }), 'failed-precondition');
+  const reviewEvents = await getDocs(query(collection(owner.db, 'taskEvents'), where('taskId', '==', reviewTaskId)));
+  const submitEvent = reviewEvents.docs.find((event) => event.get('action') === 'submitForReview');
+  assert.ok(submitEvent);
+  assert.equal(submitEvent.get('metadata.reviewCycle'), 1);
+  assert.equal(submitEvent.get('metadata.reviewWorkingDays'), 2);
+  assert.equal((await adminDb.collection('taskEvents').get()).size, 21);
+
+  console.log('PASS: task schema, permissions, request and progress transitions, deadline approvals, review submission, and history.');
 } finally {
   for (const app of apps) await deleteApp(app);
   await deleteAdminApp(admin);

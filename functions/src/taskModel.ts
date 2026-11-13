@@ -95,6 +95,7 @@ export async function createTaskRecord(db: Firestore, requesterId: string, value
       reviewRequired: input.reviewRequired,
       reviewWorkingDays: input.reviewDays,
       reviewCycle: 0,
+      reviewSubmittedAt: null,
       reviewDeadlineAt: null,
       completionReason: null,
       createdAt: now,

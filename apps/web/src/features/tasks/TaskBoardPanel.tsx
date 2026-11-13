@@ -20,6 +20,7 @@ const statusLabels: Record<TaskStatus, string> = {
 const eventLabels: Record<TaskRequestAction, string> = {
   accept: '업무 요청 수락', decline: '업무 요청 거절', startProgress: '업무 진행 시작',
   proposeDueDate: '마감 변경 제안', approveDueDate: '마감 변경 승인', rejectDueDate: '마감 변경 거절',
+  submitForReview: '검수 요청 제출',
 };
 
 function formatDate(value: Timestamp | null): string {
@@ -50,6 +51,7 @@ function TaskHistory({ db, task, memberEmails }: { db: Firestore; task: BoardTas
         <small>{memberEmails[event.actorId] ?? '멤버'} · {formatDate(event.createdAt)}</small>
         {event.action === 'proposeDueDate' && event.metadata.proposedDueDate && <small>제안 {formatDate(Timestamp.fromDate(new Date(event.metadata.proposedDueDate)))}</small>}
         {event.action === 'approveDueDate' && event.metadata.dueDate && <small>확정 {formatDate(Timestamp.fromDate(new Date(event.metadata.dueDate)))}</small>}
+        {event.action === 'submitForReview' && event.metadata.reviewWorkingDays && <small>검수 기간 {event.metadata.reviewWorkingDays}근무일 · {event.metadata.reviewCycle}회차</small>}
       </li>)}
     </ol>}
   </div>;
@@ -77,7 +79,7 @@ function TaskCard({ task, auth, db, functions, viewerId, memberEmails, onNotice 
       await respondTask(auth, functions, { taskId: task.id, action, ...(proposedDueDate ? { proposedDueDate } : {}) });
       setShowProposal(false);
       setDueLocal('');
-      onNotice({ accept: '업무 요청을 수락했습니다.', decline: '업무 요청을 거절했습니다.', startProgress: '업무 진행을 시작했습니다.', proposeDueDate: '마감 변경을 제안했습니다.', approveDueDate: '제안한 마감일을 승인했습니다.', rejectDueDate: '마감 변경 제안을 거절했습니다.' }[action]);
+      onNotice({ accept: '업무 요청을 수락했습니다.', decline: '업무 요청을 거절했습니다.', startProgress: '업무 진행을 시작했습니다.', proposeDueDate: '마감 변경을 제안했습니다.', approveDueDate: '제안한 마감일을 승인했습니다.', rejectDueDate: '마감 변경 제안을 거절했습니다.', submitForReview: '검수를 요청했습니다.' }[action]);
     } catch (cause) {
       setError(taskResponseError(cause));
     } finally {
@@ -95,11 +97,13 @@ function TaskCard({ task, auth, db, functions, viewerId, memberEmails, onNotice 
     <div className={styles.cardTop}><span className={`${styles.status} ${task.status === 'REQUESTED' ? styles.requested : ''}`}>{statusLabels[task.status]}</span><span className={styles.due}>마감 {formatDate(task.dueDate)}</span></div>
     <h2>{task.title}</h2>
     {task.description && <p className={styles.description}>{task.description}</p>}
-    <div className={styles.meta}><span>요청 {memberEmails[task.requesterId] ?? '멤버'}</span><span>담당 {memberEmails[task.assigneeId] ?? '멤버'}</span>{task.estimatedMinutes && <span>예상 {task.estimatedMinutes}분</span>}{task.reviewRequired && <span>검수 필요</span>}</div>
+    <div className={styles.meta}><span>요청 {memberEmails[task.requesterId] ?? '멤버'}</span><span>담당 {memberEmails[task.assigneeId] ?? '멤버'}</span>{task.estimatedMinutes && <span>예상 {task.estimatedMinutes}분</span>}{task.reviewRequired && <span>검수 {task.reviewWorkingDays}근무일</span>}</div>
     {task.proposedDueDate && <div className={styles.proposal}><strong>제안된 마감</strong><span>{formatDate(task.proposedDueDate)}</span><small>요청자가 승인하기 전까지 기존 마감일이 유지됩니다.</small></div>}
+    {task.status === 'REVIEW_PENDING' && <div className={styles.reviewInfo}><strong>검수 요청됨</strong><span>{isRequester ? '담당자가 검수를 요청했습니다.' : '요청자의 검수를 기다리는 중입니다.'}</span><small>{task.reviewSubmittedAt && `제출 ${formatDate(task.reviewSubmittedAt)} · `}검수 기간 {task.reviewWorkingDays}근무일</small></div>}
     {isAssignee && negotiable && <div className={styles.actions}>
       {requested && !task.proposedDueDate && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('accept')}>수락</button>}
       {task.status === 'ACCEPTED' && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('startProgress')}>진행 시작</button>}
+      {task.status === 'IN_PROGRESS' && task.reviewRequired && !task.proposedDueDate && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('submitForReview')}>검수 요청</button>}
       {!task.proposedDueDate && <button type="button" disabled={pending} onClick={() => setShowProposal((value) => !value)}>마감 변경 제안</button>}
       {requested && <button type="button" className={styles.danger} disabled={pending} onClick={() => void act('decline')}>{task.proposedDueDate ? '요청 거절' : '거절'}</button>}
       {task.proposedDueDate && <span className={styles.waiting}>요청자의 마감 변경 응답을 기다리는 중</span>}

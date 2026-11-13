@@ -3,7 +3,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import type { RespondToTaskRequest, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
-const actions = new Set<TaskRequestAction>(['accept', 'decline', 'startProgress', 'proposeDueDate', 'approveDueDate', 'rejectDueDate']);
+const actions = new Set<TaskRequestAction>(['accept', 'decline', 'startProgress', 'proposeDueDate', 'approveDueDate', 'rejectDueDate', 'submitForReview']);
 
 function parseFutureDate(value: unknown): Timestamp {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
@@ -51,7 +51,7 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
     const assigneeId = task.get('assigneeId');
     const actorIsAssignee = assigneeId === actorId;
     const actorIsRequester = requesterId === actorId;
-    const assigneeAction = input.action === 'accept' || input.action === 'decline' || input.action === 'startProgress' || input.action === 'proposeDueDate';
+    const assigneeAction = input.action === 'accept' || input.action === 'decline' || input.action === 'startProgress' || input.action === 'proposeDueDate' || input.action === 'submitForReview';
     if (assigneeAction ? !actorIsAssignee : !actorIsRequester) {
       throw new HttpsError('permission-denied', assigneeAction ? '담당자만 요청에 응답할 수 있습니다.' : '요청자만 마감 변경 제안에 응답할 수 있습니다.');
     }
@@ -61,6 +61,9 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
     }
     if (input.action === 'startProgress' && currentStatus !== 'ACCEPTED') {
       throw new HttpsError('failed-precondition', '수락된 업무만 진행을 시작할 수 있습니다.');
+    }
+    if (input.action === 'submitForReview' && currentStatus !== 'IN_PROGRESS') {
+      throw new HttpsError('failed-precondition', '진행 중인 업무만 검수를 요청할 수 있습니다.');
     }
     if ((input.action === 'proposeDueDate' || input.action === 'approveDueDate' || input.action === 'rejectDueDate')
       && currentStatus !== 'REQUESTED' && currentStatus !== 'ACCEPTED' && currentStatus !== 'IN_PROGRESS') {
@@ -86,15 +89,25 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
     if (input.action === 'proposeDueDate' && input.proposedDue!.isEqual(currentDue)) {
       throw new HttpsError('invalid-argument', '현재 마감일과 다른 날짜를 제안해 주세요.');
     }
+    const reviewDays = task.get('reviewWorkingDays');
+    const reviewCycle = task.get('reviewCycle');
+    if (input.action === 'submitForReview') {
+      if (task.get('reviewRequired') !== true || !Number.isInteger(reviewDays) || reviewDays < 1 || reviewDays > 10) {
+        throw new HttpsError('failed-precondition', '검수가 설정된 업무만 제출할 수 있습니다.');
+      }
+      if (reviewCycle !== 0) throw new HttpsError('failed-precondition', '이미 검수를 요청한 업무입니다.');
+      if (pendingDue !== null) throw new HttpsError('failed-precondition', '대기 중인 마감 변경 제안을 먼저 처리해 주세요.');
+    }
 
     const now = Timestamp.now();
-    const updates: { updatedAt: Timestamp; status?: TaskStatus; proposedDueDate?: Timestamp | null; dueDate?: Timestamp } = { updatedAt: now };
+    const updates: { updatedAt: Timestamp; status?: TaskStatus; proposedDueDate?: Timestamp | null; dueDate?: Timestamp; reviewCycle?: number; reviewSubmittedAt?: Timestamp } = { updatedAt: now };
     let status: TaskStatus = currentStatus;
     let due = currentDue;
     let proposed: Timestamp | null = pendingDue;
     if (input.action === 'accept') { status = 'ACCEPTED'; updates.status = status; }
     if (input.action === 'decline') { status = 'DECLINED'; updates.status = status; updates.proposedDueDate = null; proposed = null; }
     if (input.action === 'startProgress') { status = 'IN_PROGRESS'; updates.status = status; }
+    if (input.action === 'submitForReview') { status = 'REVIEW_PENDING'; updates.status = status; updates.reviewCycle = 1; updates.reviewSubmittedAt = now; }
     if (input.action === 'proposeDueDate') { updates.proposedDueDate = input.proposedDue; proposed = input.proposedDue; }
     if (input.action === 'approveDueDate') { updates.dueDate = pendingDue; updates.proposedDueDate = null; due = pendingDue!; proposed = null; }
     if (input.action === 'rejectDueDate') { updates.proposedDueDate = null; proposed = null; }
@@ -105,6 +118,8 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
         ? { previousDueDate: currentDue.toDate().toISOString(), dueDate: pendingDue!.toDate().toISOString() }
         : input.action === 'rejectDueDate'
           ? { proposedDueDate: pendingDue!.toDate().toISOString() }
+          : input.action === 'submitForReview'
+            ? { reviewCycle: 1, reviewWorkingDays: reviewDays as number }
           : {};
     transaction.create(eventRef, {
       taskId: input.taskId,

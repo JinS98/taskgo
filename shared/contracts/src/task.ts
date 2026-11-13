@@ -14,7 +14,7 @@ export interface CreateTaskRequest {
   estimatedMinutes?: number | null;
 }
 
-export type TaskRequestAction = 'accept' | 'decline' | 'startProgress' | 'proposeDueDate' | 'approveDueDate' | 'rejectDueDate';
+export type TaskRequestAction = 'accept' | 'decline' | 'startProgress' | 'proposeDueDate' | 'approveDueDate' | 'rejectDueDate' | 'submitForReview';
 
 export interface RespondToTaskRequest {
   taskId: string;
@@ -31,6 +31,8 @@ export interface TaskEventRecord<TimestampValue> {
     previousDueDate?: string;
     proposedDueDate?: string;
     dueDate?: string;
+    reviewCycle?: number;
+    reviewWorkingDays?: number;
   };
 }
 
@@ -49,6 +51,7 @@ export interface TaskRecord<TimestampValue> {
   reviewRequired: boolean;
   reviewWorkingDays: number | null;
   reviewCycle: number;
+  reviewSubmittedAt?: TimestampValue | null;
   reviewDeadlineAt: TimestampValue | null;
   completionReason: TaskCompletionReason | null;
   createdAt: TimestampValue;

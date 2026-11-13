@@ -9,7 +9,7 @@
 - `channels/{channelId}`: workspaceId, name. 8일차 규칙은 워크스페이스 전체 공개 채널만 지원한다.
 - `dmRooms/{roomId}`: workspaceId, participantIds
 - `messages/{messageId}`: workspaceId, sourceType(channel/dm), channelId 또는 dmRoomId, senderId, clientMessageId, content, createdAt. 서버가 사용자 UID와 `clientMessageId`로 결정한 ID에 트랜잭션으로 한 번만 생성한다. `createdAt`은 소켓 서버가 생성한 Firestore Timestamp다. 같은 사용자의 클라이언트 ID는 룸과 워크스페이스를 통틀어 고유해야 한다.
-- `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType(channel/dm), title, description, requesterId, assigneeId, dueDate, proposedDueDate, estimatedMinutes, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewDeadlineAt, completionReason, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp이며, 미확정 값은 null이다. 타입 계약은 `shared/contracts/src/task.ts`에 둔다.
+- `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType(channel/dm), title, description, requesterId, assigneeId, dueDate, proposedDueDate, estimatedMinutes, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewSubmittedAt, reviewDeadlineAt, completionReason, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp이며, 미확정 값은 null이다. 타입 계약은 `shared/contracts/src/task.ts`에 둔다.
 - `taskEvents/{eventId}`: taskId, actorId, action, createdAt, metadata
 - `notifications/{id}`: recipientId, taskId, reviewCycle, type, scheduledAt, sentAt
 - `meetings/{id}`: workspaceId, title, startsAt, endsAt
@@ -35,6 +35,12 @@
 - 담당자만 `ACCEPTED` 업무에 `startProgress`를 호출해 `IN_PROGRESS`로 전이한다. 중복 호출이나 다른 상태에서의 호출은 거부한다.
 - 담당자는 `REQUESTED`·`ACCEPTED`·`IN_PROGRESS` 상태에서 새 마감을 제안할 수 있다. 요청자만 승인·거절한다. 승인 전에는 `dueDate`와 상태를 보존하고 제안일을 `proposedDueDate`에 둔다. 승인 후에도 상태는 그대로 유지한다.
 - 제안·승인·거절과 진행 시작은 서버 트랜잭션으로 기록한다. 제안 이력에는 기존·제안 마감, 승인 이력에는 기존·확정 마감을 남긴다. 업무별 이력 조회는 워크스페이스 멤버에게만 허용하고, UI는 기존 업무를 위해 `createdAt`을 요청 생성 이력으로 함께 표시한다.
+
+## 검수 제출 (22일차)
+
+- 검수 대상 업무의 담당자만 `IN_PROGRESS`에서 `submitForReview`를 호출할 수 있다. 대기 중인 마감 제안이 있거나 검수 기간 설정이 유효하지 않으면 거부한다.
+- 서버는 업무 상태를 `REVIEW_PENDING`으로, 검수 회차를 `1`로 바꾸고 `reviewSubmittedAt`에 제출 시각을 기록한다. 같은 트랜잭션에서 `taskEvents`에 제출 이벤트와 선택된 검수 기간을 남긴다. 중복 제출은 상태 검사로 거부한다.
+- `reviewDeadlineAt`은 24일차 근무시간·공휴일 계산에서 설정한다. 현재 보드에는 제출 시각과 선택한 기간을 표시한다.
 
 ## 권한
 - 워크스페이스 장만 초대를 발송·철회·조회한다. 초대 수락은 서버 트랜잭션에서 로그인 이메일 확인 여부·초대 이메일 일치·토큰 해시·만료·사용 여부·멤버십 중복을 검증하고 멤버십·목록 미러·초대 상태를 한 번에 기록한다. 초대 기한은 7일이다.
