@@ -91,6 +91,31 @@ export function createSocketApp({ allowedOrigins, services }: SocketAppOptions) 
     }));
   }
 
+  async function deliverTyping(target: RoomTarget, userId: string, active: boolean, senderSocketId: string): Promise<void> {
+    const name = roomName(target);
+    const socketIds = [...(io.sockets.adapter.rooms.get(name) ?? [])];
+    await Promise.all(socketIds.map(async (socketId) => {
+      if (socketId === senderSocketId) return;
+      const recipient = io.sockets.sockets.get(socketId);
+      if (!recipient?.connected || !recipient.rooms.has(name)) return;
+      if (recipient.data.identity.expiresAt <= Date.now()) {
+        recipient.disconnect(true);
+        return;
+      }
+      try {
+        if (!await services.canAccessRoom(recipient.data.identity.uid, target)) {
+          await recipient.leave(name);
+          return;
+        }
+        if (recipient.connected && recipient.rooms.has(name) && recipient.data.identity.expiresAt > Date.now()) {
+          recipient.emit('typing:changed', { ...target, userId, active });
+        }
+      } catch {
+        // A failed permission lookup must never become permission to receive.
+      }
+    }));
+  }
+
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     if (typeof token !== 'string' || !token || token.length > 8192) {
@@ -112,8 +137,13 @@ export function createSocketApp({ allowedOrigins, services }: SocketAppOptions) 
 
   io.on('connection', (socket) => {
     const identity = socket.data.identity;
+    const activeTyping = new Map<string, RoomTarget>();
     const expiryTimer = setTimeout(() => socket.disconnect(true), Math.max(0, identity.expiresAt - Date.now()));
-    socket.on('disconnect', () => clearTimeout(expiryTimer));
+    socket.on('disconnect', () => {
+      clearTimeout(expiryTimer);
+      for (const target of activeTyping.values()) void deliverTyping(target, identity.uid, false, socket.id);
+      activeTyping.clear();
+    });
     socket.emit('server:ready', { protocolVersion });
 
     async function authorize<T>(rawTarget: unknown, ack: (result: SocketAck<T>) => void, requireJoined: boolean): Promise<RoomTarget | null> {
@@ -169,6 +199,7 @@ export function createSocketApp({ allowedOrigins, services }: SocketAppOptions) 
           return;
         }
         await socket.leave(roomName(target));
+        if (activeTyping.delete(roomName(target))) void deliverTyping(target, identity.uid, false, socket.id);
         if (typeof ack === 'function') ack({ ok: true, data: { left: true } });
       });
     });
@@ -210,7 +241,11 @@ export function createSocketApp({ allowedOrigins, services }: SocketAppOptions) 
           if (typeof ack === 'function') ack(failure('INVALID_REQUEST', '타이핑 상태를 확인해 주세요.'));
           return;
         }
-        if (typeof ack === 'function') ack(failure('FEATURE_NOT_READY', '타이핑 전파는 다음 작업에서 연결합니다.'));
+        if (!socket.connected || !socket.rooms.has(roomName(target))) return;
+        if (payload.active) activeTyping.set(roomName(target), target);
+        else activeTyping.delete(roomName(target));
+        if (typeof ack === 'function') ack({ ok: true, data: { accepted: true } });
+        void deliverTyping(target, identity.uid, payload.active, socket.id);
       });
     });
   });

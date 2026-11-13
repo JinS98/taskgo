@@ -180,16 +180,43 @@ try {
   const memberEvents = [];
   const googleEvents = [];
   const outsiderEvents = [];
+  const ownerTypingEvents = [];
+  const memberTypingEvents = [];
+  const googleTypingEvents = [];
+  const outsiderTypingEvents = [];
   ownerClient.on('message:created', (message) => ownerEvents.push(message));
   memberClient.on('message:created', (message) => memberEvents.push(message));
   googleClient.on('message:created', (message) => googleEvents.push(message));
   outsiderClient.on('message:created', (message) => outsiderEvents.push(message));
+  ownerClient.on('typing:changed', (event) => ownerTypingEvents.push(event));
+  memberClient.on('typing:changed', (event) => memberTypingEvents.push(event));
+  googleClient.on('typing:changed', (event) => googleTypingEvents.push(event));
+  outsiderClient.on('typing:changed', (event) => outsiderTypingEvents.push(event));
+
+  await ack(outsiderClient, 'typing:set', { ...channel, active: true }, 'FORBIDDEN');
+  await ack(ownerClient, 'typing:set', { ...channel, active: 'yes' }, 'INVALID_REQUEST');
+  await ack(ownerClient, 'typing:set', { ...channel, active: true });
+  await waitUntil(() => memberTypingEvents.length === 1 && googleTypingEvents.length === 1);
+  assert.deepEqual(memberTypingEvents[0], { ...channel, userId: owner.uid, active: true });
+  assert.deepEqual(googleTypingEvents[0], memberTypingEvents[0]);
+  assert.equal(ownerTypingEvents.length, 0);
+  assert.equal(outsiderTypingEvents.length, 0);
+  await ack(ownerClient, 'typing:set', { ...channel, active: false });
+  await waitUntil(() => memberTypingEvents.length === 2 && googleTypingEvents.length === 2);
+  assert.equal(memberTypingEvents[1].active, false);
+  await ack(ownerClient, 'typing:set', { ...dm, active: true });
+  await waitUntil(() => memberTypingEvents.length === 3);
+  assert.deepEqual(memberTypingEvents[2], { ...dm, userId: owner.uid, active: true });
+  assert.equal(googleTypingEvents.length, 2, 'DM typing leaked to a non-participant.');
+  await ack(ownerClient, 'room:leave', dm);
+  await waitUntil(() => memberTypingEvents.length === 4);
+  assert.equal(memberTypingEvents[3].active, false);
+  await ack(ownerClient, 'room:join', dm);
 
   const message = { ...channel, clientMessageId: 'message-one', content: '인증된 메시지' };
   await ack(outsiderClient, 'message:send', message, 'FORBIDDEN');
   await ack(ownerClient, 'message:send', { ...message, roomId: 'foreign' }, 'FORBIDDEN');
   await ack(ownerClient, 'message:send', { ...message, content: '   ' }, 'INVALID_REQUEST');
-  await ack(ownerClient, 'typing:set', { ...channel, active: true }, 'FEATURE_NOT_READY');
   failNextSave = true;
   await ack(ownerClient, 'message:send', { ...message, clientMessageId: 'failed-write' }, 'INTERNAL_ERROR');
   assert.equal((await db.collection('messages').get()).empty, true);
@@ -267,6 +294,11 @@ try {
 
   await db.doc('dmRooms/private').update({ participantIds: [owner.uid] });
   const dmEventsBeforeRemoval = memberEvents.length;
+  const memberTypingBeforeRemoval = memberTypingEvents.length;
+  await ack(ownerClient, 'typing:set', { ...dm, active: true });
+  await waitUntil(() => !app.io.sockets.sockets.get(memberClient.id)?.rooms.has('workspace/socket-team/dm/private'));
+  assert.equal(memberTypingEvents.length, memberTypingBeforeRemoval, 'Revoked DM participant received typing.');
+  await ack(ownerClient, 'typing:set', { ...dm, active: false });
   const ownerDmAfterRemoval = nextMessage(ownerClient);
   await ack(ownerClient, 'message:send', { ...dm, clientMessageId: 'dm-two', content: '권한 변경 후' });
   await ownerDmAfterRemoval;

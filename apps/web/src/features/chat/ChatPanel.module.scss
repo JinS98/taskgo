@@ -6,6 +6,8 @@
 .previewTag { flex: 0 0 auto; padding: 7px 10px; border: 1px solid #615a83; border-radius: 999px; color: #cec3ff; font-size: 11px; font-weight: 700; }
 .connectionError { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px clamp(20px, 4vw, 48px); background: #61323f; color: #ffe3e5; font-size: 13px; }
 .connectionError button { flex: 0 0 auto; padding: 6px 10px; border: 1px solid #c996a2; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: 700; }
+.sendError { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px clamp(20px, 4vw, 48px); background: #4a3448; color: #ffe3e5; font-size: 13px; }
+.sendError button { padding: 2px 7px; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 20px; }
 .messages { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 28px clamp(20px, 4vw, 48px); scrollbar-width: thin; scrollbar-color: #626083 var(--page); }
 .messages::-webkit-scrollbar { width: 10px; }
 .messages::-webkit-scrollbar-track { background: var(--page); }
@@ -27,6 +29,8 @@
 .failed { color: #ffb4b4 !important; }
 .retry { margin-top: 5px; padding: 0; border: 0; background: transparent; color: #ffb4b4; cursor: pointer; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 .composerWrap { flex: 0 0 auto; padding: 16px clamp(20px, 4vw, 48px) 20px; border-top: 1px solid var(--line); background: #22263d; }
+.typingIndicator { min-height: 20px; max-width: 900px; margin: 0 auto 5px; overflow: hidden; color: #c8bfff; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.typingDots { margin-right: 7px; color: var(--accent); letter-spacing: 2px; }
 .composer { display: flex; align-items: flex-end; gap: 12px; max-width: 900px; margin: 0 auto; padding: 9px; border: 1px solid #68678a; border-radius: 16px; background: #292d46; }
 .composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px #a99bff1c; }
 .composer textarea { min-width: 0; min-height: 44px; max-height: 180px; flex: 1; resize: vertical; padding: 11px 8px; border: 0; outline: none; background: transparent; color: #fff; font: inherit; font-size: 14px; line-height: 1.5; }
@@ -36,7 +40,7 @@
 .composerHint { display: flex; justify-content: space-between; gap: 12px; max-width: 900px; margin: 8px auto 0; color: var(--muted); font-size: 11px; }
 @media (max-width: 760px) {
   .header { min-height: 72px; }
-  .previewTag { display: none; }
+  .previewTag { padding: 5px 8px; font-size: 10px; }
   .messages { padding-block: 20px; }
   .own .messageBody { max-width: calc(100% - 50px); }
   .composerWrap { padding-bottom: 14px; }

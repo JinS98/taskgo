@@ -123,8 +123,15 @@ try {
   await visibleOnce(memberPage, 'owner channel message');
   await send(memberPage, 'member channel reply');
   await visibleOnce(ownerPage, 'member channel reply');
+  await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('typing in channel');
+  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor();
+  await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('');
+  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor({ state: 'hidden' });
+  await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('typing before outage');
+  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor();
   await ownerPage.context().setOffline(true);
-  await ownerPage.getByText('연결 중…').waitFor({ timeout: 10000 });
+  await ownerPage.getByText('오프라인').waitFor({ timeout: 10000 });
+  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor({ state: 'hidden', timeout: 10000 });
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('owner draft after outage');
   assert.equal(await ownerPage.getByRole('button', { name: '전송', exact: true }).isDisabled(), true);
   for (let index = 0; index < 35; index += 1) {
@@ -151,6 +158,10 @@ try {
   await visibleOnce(memberPage, 'earlier direct message');
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await memberPage.getByText('실시간 연결됨').waitFor();
+  await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('typing in DM');
+  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor();
+  await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('');
+  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor({ state: 'hidden' });
   await send(ownerPage, 'owner direct message');
   await visibleOnce(memberPage, 'owner direct message');
   await ownerPage.getByRole('button', { name: '전체' }).click();
@@ -166,7 +177,7 @@ try {
   await visibleOnce(ownerPage, 'offline gap 34');
   assert.ok((await db.collection('messages').get()).size >= 70);
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions loaded paginated channel and DM history, preserved scroll, recovered missed messages, and exchanged live messages.');
+  console.log('PASS: two Chrome sessions verified channel/DM typing, connection states, paginated history, offline recovery, and live messages.');
 } finally {
   await browser?.close();
   await vite?.close();

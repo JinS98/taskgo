@@ -9,7 +9,7 @@ import { useRoomHistory } from './useRoomHistory';
 import styles from './ChatPanel.module.scss';
 
 type ChatSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
-type ConnectionState = 'connecting' | 'ready' | 'error';
+type ConnectionState = 'connecting' | 'ready' | 'error' | 'offline';
 const emptyMessages: LiveChatMessage[] = [];
 
 function readableError(result: SocketAck<unknown>): string {
@@ -40,17 +40,22 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
   const receive = useLiveChatStore((state) => state.receive);
   const [connection, setConnection] = useState<ConnectionState>('connecting');
   const [error, setError] = useState('');
+  const [sendError, setSendError] = useState('');
+  const [composerFocused, setComposerFocused] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const socketRef = useRef<ChatSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const history = useRoomHistory(auth, target, key, messages, scrollRef);
   const refreshHistory = history.refresh;
   const conversationName = getConversationName(conversation);
   const title = `${conversation.kind === 'channel' ? '# ' : ''}${conversationName}`;
+  const isTyping = composerFocused && Boolean(draft.trim());
 
   useEffect(() => {
     let active = true;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let joinTimer: ReturnType<typeof setTimeout> | undefined;
+    const typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
     const socket: ChatSocket = io(socketUrl, {
       autoConnect: false,
       auth: (callback) => {
@@ -99,6 +104,9 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
 
     socket.on('connect', () => {
       if (!active) return;
+      for (const timer of typingTimeouts.values()) clearTimeout(timer);
+      typingTimeouts.clear();
+      setTypingUsers([]);
       if (retryTimer) clearTimeout(retryTimer);
       retryTimer = undefined;
       setConnection('connecting');
@@ -113,7 +121,10 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
     });
     socket.on('disconnect', (reason) => {
       if (!active) return;
-      setConnection('connecting');
+      for (const timer of typingTimeouts.values()) clearTimeout(timer);
+      typingTimeouts.clear();
+      setTypingUsers([]);
+      setConnection(navigator.onLine ? 'connecting' : 'offline');
       if (joinTimer) clearTimeout(joinTimer);
       joinTimer = undefined;
       if (reason === 'io server disconnect') scheduleReconnect();
@@ -121,9 +132,23 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
     socket.on('message:created', (message) => {
       if (active && message.workspaceId === workspaceId && message.kind === conversation.kind && message.roomId === conversation.id) receive(key, message);
     });
+    socket.on('typing:changed', (payload) => {
+      if (!active || payload.userId === viewerId || payload.workspaceId !== workspaceId
+        || payload.kind !== conversation.kind || payload.roomId !== conversation.id) return;
+      const previous = typingTimeouts.get(payload.userId);
+      if (previous) clearTimeout(previous);
+      typingTimeouts.delete(payload.userId);
+      if (payload.active) {
+        setTypingUsers((current) => current.includes(payload.userId) ? current : [...current, payload.userId]);
+        typingTimeouts.set(payload.userId, setTimeout(() => {
+          typingTimeouts.delete(payload.userId);
+          setTypingUsers((current) => current.filter((userId) => userId !== payload.userId));
+        }, 5000));
+      } else setTypingUsers((current) => current.filter((userId) => userId !== payload.userId));
+    });
     function onOffline() {
       if (!active) return;
-      setConnection('connecting');
+      setConnection('offline');
       setError('인터넷 연결을 기다리는 중입니다.');
       socket.disconnect();
     }
@@ -136,12 +161,15 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
     }
     window.addEventListener('offline', onOffline);
     window.addEventListener('online', onOnline);
-    socket.connect();
+    if (navigator.onLine) socket.connect();
+    else onOffline();
 
     return () => {
       active = false;
       if (retryTimer) clearTimeout(retryTimer);
       if (joinTimer) clearTimeout(joinTimer);
+      for (const timer of typingTimeouts.values()) clearTimeout(timer);
+      typingTimeouts.clear();
       window.removeEventListener('offline', onOffline);
       window.removeEventListener('online', onOnline);
       if (socket.connected) socket.emit('room:leave', target, () => {});
@@ -151,16 +179,29 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
     };
   }, [auth, conversation.id, conversation.kind, key, receive, refreshHistory, target, viewerId, workspaceId]);
 
+  useEffect(() => {
+    if (connection !== 'ready' || !isTyping) return;
+    const socket = socketRef.current;
+    if (!socket?.connected) return;
+    const emit = (active: boolean) => socket.emit('typing:set', { ...target, active }, () => {});
+    emit(true);
+    const timer = setInterval(() => emit(true), 2500);
+    return () => {
+      clearInterval(timer);
+      if (socket.connected) emit(false);
+    };
+  }, [connection, isTyping, target]);
+
   async function send(message: LiveChatMessage) {
     const socket = socketRef.current;
     if (!socket?.connected || connection !== 'ready') { fail(key, message.clientMessageId); return; }
     try {
       const result = await socket.timeout(10000).emitWithAck('message:send', { ...target, clientMessageId: message.clientMessageId, content: message.content });
-      if (result.ok) confirm(key, message.clientMessageId, result.data.messageId);
-      else { fail(key, message.clientMessageId); setError(result.error.message); }
+      if (result.ok) { confirm(key, message.clientMessageId, result.data.messageId); setSendError(''); }
+      else { fail(key, message.clientMessageId); setSendError(result.error.message); }
     } catch {
       fail(key, message.clientMessageId);
-      setError('전송 결과를 확인하지 못했습니다. 같은 메시지를 다시 시도할 수 있습니다.');
+      setSendError('전송 결과를 확인하지 못했습니다. 메시지 옆의 다시 시도를 눌러 주세요.');
     }
   }
 
@@ -193,9 +234,10 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
   return <section className={styles.panel} aria-label={`${title} 대화`}>
     <header className={styles.header}>
       <div className={styles.heading}><h1>{title}</h1><p>{conversation.kind === 'channel' ? '팀 채널' : '1:1 대화'} · 실시간 대화</p></div>
-      <span className={styles.previewTag} role="status">{connection === 'ready' ? '실시간 연결됨' : connection === 'connecting' ? '연결 중…' : '연결 오류'}</span>
+      <span className={styles.previewTag} role="status">{connection === 'ready' ? '실시간 연결됨' : connection === 'connecting' ? '연결 중…' : connection === 'offline' ? '오프라인' : '연결 오류'}</span>
     </header>
-    {error && <div className={styles.connectionError} role="alert">{error}<button type="button" onClick={() => { setError(''); setConnection('connecting'); if (socketRef.current?.connected) socketRef.current.disconnect(); socketRef.current?.connect(); }}>다시 연결</button></div>}
+    {error && <div className={styles.connectionError} role="alert">{error}{connection !== 'offline' && <button type="button" onClick={() => { setError(''); setConnection('connecting'); if (socketRef.current?.connected) socketRef.current.disconnect(); socketRef.current?.connect(); }}>다시 연결</button>}</div>}
+    {sendError && <div className={styles.sendError} role="alert">{sendError}<button type="button" onClick={() => setSendError('')} aria-label="전송 오류 닫기">×</button></div>}
     {history.error && <div className={styles.connectionError} role="alert">{history.error}<button type="button" onClick={() => void history.refresh()}>다시 불러오기</button></div>}
     <div className={styles.messages} ref={scrollRef} onScroll={history.onScroll} aria-label="메시지 목록">
       <div className={styles.historyControls}>
@@ -216,8 +258,9 @@ export function LiveChatPanel({ auth, conversation, workspaceId, viewerId, sende
       </ol>
     </div>
     <div className={styles.composerWrap}>
+      <div className={styles.typingIndicator} role="status" aria-live="polite">{typingUsers.length > 0 && <><span className={styles.typingDots} aria-hidden="true">•••</span>{typingUsers.map((userId) => memberEmails[userId] ?? '팀원').join(', ')}님이 입력 중…</>}</div>
       <form className={styles.composer} onSubmit={submit}>
-        <textarea aria-label="메시지 입력" value={draft} onChange={(event) => setDraft(key, event.target.value)} onKeyDown={handleKeyDown} maxLength={4000} rows={2} placeholder={`${conversationName}에 메시지 입력`} />
+        <textarea aria-label="메시지 입력" value={draft} onChange={(event) => setDraft(key, event.target.value)} onFocus={() => setComposerFocused(true)} onBlur={() => setComposerFocused(false)} onKeyDown={handleKeyDown} maxLength={4000} rows={2} placeholder={`${conversationName}에 메시지 입력`} />
         <button type="submit" disabled={connection !== 'ready' || !draft.trim()}>전송</button>
       </form>
       <div className={styles.composerHint}><span>{connection === 'ready' ? '메시지는 팀원에게 실시간으로 전달됩니다.' : '연결되면 메시지를 보낼 수 있습니다.'}</span><span>Enter 전송 · Shift+Enter 줄바꿈</span></div>
