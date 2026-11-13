@@ -3,7 +3,8 @@
 > 8일차에 워크스페이스·초대·멤버십 경로와 읽기 권한을 구현했고, 12일차에 서버 전용 메시지 저장 필드를 구현했다. 17일차에 업무 생성 문서와 서버 검증을 구현했다. 로그인한 이메일 사용자의 최초 워크스페이스 생성 3문서 일괄 쓰기만 클라이언트에서 허용하고 나머지 쓰기는 차단한다.
 
 - `workspaces/{workspaceId}`: name, ownerId, createdAt. 클라이언트가 생성할 때 장 멤버십과 본인 목록 미러를 같은 일괄 쓰기로 생성해야 한다.
-- `workspaces/{workspaceId}/members/{uid}`: uid, email, displayName(새 계정부터), role(owner/member), joinedAt. 문서 ID를 Firebase UID로 고정한다.
+- `users/{uid}`: displayName, setupComplete, createdAt, updatedAt. 첫 로그인 후 본인만 이름을 등록·수정한다.
+- `workspaces/{workspaceId}/members/{uid}`: uid, email, displayName, role(owner/member), joinedAt. 문서 ID를 Firebase UID로 고정하고 이름 변경 시 본인 멤버십에 반영한다. 기존 문서에 이름이 없으면 화면에는 UID 기반 임시 이름을 보여준다.
 - `users/{uid}/workspaces/{workspaceId}`: workspaceId, name, role, joinedAt. 본인의 워크스페이스 목록용 미러로 생성자 일괄 쓰기 또는 초대 수락 서버 트랜잭션에서 기록한다.
 - `workspaceInvites/{inviteId}`: workspaceId, invitedEmail, invitedBy, tokenHash, status(pending/accepted/revoked), createdAt, emailSentAt, expiresAt, acceptedBy, acceptedAt, revokedAt. 원본 토큰은 저장하지 않고 초대 문서는 클라이언트가 직접 읽지 못한다.
 - `channels/{channelId}`: workspaceId, name. 8일차 규칙은 워크스페이스 전체 공개 채널만 지원한다.

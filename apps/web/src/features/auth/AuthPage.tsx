@@ -5,7 +5,6 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
-  updateProfile,
   type Auth,
 } from 'firebase/auth';
 import { getAuthErrorMessage } from './authErrors';
@@ -18,7 +17,6 @@ interface AuthPageProps {
 export function AuthPage({ auth }: AuthPageProps) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -32,13 +30,7 @@ export function AuthPage({ auth }: AuthPageProps) {
     try {
       const normalizedEmail = email.trim();
       if (mode === 'signup') {
-        const normalizedName = displayName.trim();
-        if (normalizedName.length < 2 || normalizedName.length > 40) {
-          setErrorMessage('이름은 2~40자로 입력해 주세요.');
-          return;
-        }
-        const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-        await updateProfile(credential.user, { displayName: normalizedName });
+        await createUserWithEmailAndPassword(auth, normalizedEmail, password);
       } else {
         await signInWithEmailAndPassword(auth, normalizedEmail, password);
       }
@@ -86,7 +78,6 @@ export function AuthPage({ auth }: AuthPageProps) {
         <p className={styles.helper}>이메일·비밀번호 또는 Google 계정으로 계속할 수 있습니다.</p>
 
         <form onSubmit={handleEmailSubmit} className={styles.form}>
-          {mode === 'signup' && <><label htmlFor="auth-name">이름</label><input id="auth-name" name="name" type="text" autoComplete="name" minLength={2} maxLength={40} required value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={pending} placeholder="팀에서 사용할 이름" /></>}
           <label htmlFor="auth-email">이메일</label>
           <input id="auth-email" name="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={pending} />
           <label htmlFor="auth-password">비밀번호</label>
@@ -97,7 +88,7 @@ export function AuthPage({ auth }: AuthPageProps) {
 
         <div className={styles.divider}><span>또는</span></div>
         <button className={styles.secondaryButton} type="button" onClick={handleGoogleSignIn} disabled={pending}>Google 계정으로 계속하기</button>
-        <p className={styles.note}>가입 후 바로 워크스페이스를 만들 수 있습니다. 멤버 초대 메일은 워크스페이스 관리에서 보냅니다.</p>
+        <p className={styles.note}>로그인 후 팀에서 사용할 이름을 정합니다. 워크스페이스는 만들거나 초대 링크로 참여할 수 있습니다.</p>
       </section>
     </main>
   );

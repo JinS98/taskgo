@@ -108,6 +108,13 @@ try {
   await assertSucceeds(ownerDb.doc(workspacePath).get());
   await assertSucceeds(guestDb.doc(workspacePath).get());
   await assertSucceeds(ownerDb.collection(`${workspacePath}/members`).get());
+  const ownerProfile = ownerDb.doc(`users/${owner.user.uid}`);
+  await adminDb.doc(`users/${owner.user.uid}`).set({ displayName: '테스트 방장', setupComplete: true, createdAt: Timestamp.now(), updatedAt: Timestamp.now() });
+  await assertSucceeds(ownerProfile.get());
+  await assertFails(guestDb.doc(`users/${owner.user.uid}`).get());
+  await assertSucceeds(ownerDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ displayName: '변경한 방장' }));
+  await assertFails(guestDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ displayName: '위조' }));
+  await assertFails(ownerDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ role: 'member' }));
   await assertFails(unknownDb.doc(workspacePath).get());
   await assertFails(publicDb.doc(workspacePath).get());
   await assertSucceeds(guestDb.doc(`users/${guest.user.uid}/workspaces/${workspaceId}`).get());

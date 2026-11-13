@@ -8,7 +8,7 @@ interface DmRoom { id: string; participantIds: string[] }
 export function useWorkspaceConversations(db?: Firestore, workspaceId?: string, viewerId?: string) {
   const [channels, setChannels] = useState<ScopedItems<DemoChannel>>({ workspaceId: '', items: [] });
   const [rooms, setRooms] = useState<ScopedItems<DmRoom>>({ workspaceId: '', items: [] });
-  const [members, setMembers] = useState<{ workspaceId: string; emails: Record<string, string> }>({ workspaceId: '', emails: {} });
+  const [members, setMembers] = useState<{ workspaceId: string; emails: Record<string, string>; names: Record<string, string> }>({ workspaceId: '', emails: {}, names: {} });
   const [errors, setErrors] = useState<Record<'channels' | 'rooms' | 'members', string>>({ channels: '', rooms: '', members: '' });
 
   useEffect(() => {
@@ -22,7 +22,11 @@ export function useWorkspaceConversations(db?: Firestore, workspaceId?: string, 
       setErrors((current) => ({ ...current, rooms: '' }));
     }, () => setErrors((current) => ({ ...current, rooms: 'DM 목록을 불러오지 못했습니다.' })));
     const stopMembers = onSnapshot(collection(db, 'workspaces', workspaceId, 'members'), (snapshot) => {
-      setMembers({ workspaceId, emails: Object.fromEntries(snapshot.docs.map((item) => [item.id, String(item.get('email') || item.id)])) });
+      setMembers({
+        workspaceId,
+        emails: Object.fromEntries(snapshot.docs.map((item) => [item.id, String(item.get('email') || item.id)])),
+        names: Object.fromEntries(snapshot.docs.map((item) => [item.id, String(item.get('displayName') || `팀원-${item.id.slice(0, 4).toUpperCase()}`)])),
+      });
       setErrors((current) => ({ ...current, members: '' }));
     }, () => setErrors((current) => ({ ...current, members: '멤버 목록을 불러오지 못했습니다.' })));
     return () => { stopChannels(); stopRooms(); stopMembers(); };
@@ -37,13 +41,13 @@ export function useWorkspaceConversations(db?: Firestore, workspaceId?: string, 
 
   const directMessages = useMemo(() => {
     if (!workspaceId || rooms.workspaceId !== workspaceId) return [];
-    const emails = members.workspaceId === workspaceId ? members.emails : {};
+    const names = members.workspaceId === workspaceId ? members.names : {};
     return rooms.items.map((room): DemoDirectMessage => {
       const otherId = room.participantIds.find((id) => id !== viewerId) ?? viewerId ?? '';
-      const name = emails[otherId] ?? otherId;
+      const name = names[otherId] ?? `팀원-${otherId.slice(0, 4).toUpperCase()}`;
       return { id: room.id, name, initials: name.charAt(0).toUpperCase() };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [members, rooms, viewerId, workspaceId]);
 
-  return { channels: availableChannels, directMessages, memberEmails: members.workspaceId === workspaceId ? members.emails : {}, error: Object.values(errors).filter(Boolean).join(' ') };
+  return { channels: availableChannels, directMessages, memberEmails: members.workspaceId === workspaceId ? members.emails : {}, memberNames: members.workspaceId === workspaceId ? members.names : {}, error: Object.values(errors).filter(Boolean).join(' ') };
 }

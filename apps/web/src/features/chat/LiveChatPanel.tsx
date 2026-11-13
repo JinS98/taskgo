@@ -22,7 +22,7 @@ function pendingMessage(viewerId: string, content: string): LiveChatMessage {
   return { clientMessageId: crypto.randomUUID(), senderId: viewerId, content, createdAt: Date.now(), status: 'sending' };
 }
 
-export function LiveChatPanel({ auth, functions, conversation, workspaceId, viewerId, senderName, memberEmails }: {
+export function LiveChatPanel({ auth, functions, conversation, workspaceId, viewerId, senderName, memberEmails, memberNames }: {
   auth: Auth;
   functions: Functions;
   conversation: ConversationSelection;
@@ -30,6 +30,7 @@ export function LiveChatPanel({ auth, functions, conversation, workspaceId, view
   viewerId: string;
   senderName: string;
   memberEmails: Record<string, string>;
+  memberNames: Record<string, string>;
 }) {
   const target: RoomTarget = useMemo(() => ({ workspaceId, kind: conversation.kind, roomId: conversation.id }), [workspaceId, conversation.kind, conversation.id]);
   const key = liveRoomKey(viewerId, target);
@@ -255,7 +256,7 @@ export function LiveChatPanel({ auth, functions, conversation, workspaceId, view
       <ol className={styles.messageList}>
         {messages.map((message) => {
           const own = message.senderId === viewerId;
-          const author = own ? '나' : memberEmails[message.senderId] ?? '팀원';
+          const author = own ? senderName : memberNames[message.senderId] ?? '팀원';
           return <li className={`${styles.message} ${own ? styles.own : ''}`} key={message.messageId ?? `${message.senderId}:${message.clientMessageId}`}>
             <span className={styles.avatar} aria-hidden="true">{(own ? senderName : author).charAt(0).toUpperCase()}</span>
             <div className={styles.messageBody}><div className={styles.messageMeta}><strong>{author}</strong><time>{new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: '2-digit' }).format(message.createdAt)}</time>{own && <span className={message.status === 'failed' ? styles.failed : ''}>{message.status === 'sending' ? '전송 중…' : message.status === 'failed' ? '전송 실패' : '전송됨'}</span>}</div><p>{message.content}</p>{own && message.status === 'failed' && <button className={styles.retry} type="button" disabled={connection !== 'ready'} onClick={() => retry(message)}>다시 시도</button>}{message.messageId && <span className={styles.messageToolbar}><button className={styles.taskAction} type="button" onClick={() => { setTaskNotice(''); setTaskSource(message); }}>＋ 업무 요청</button></span>}</div>
@@ -264,13 +265,13 @@ export function LiveChatPanel({ auth, functions, conversation, workspaceId, view
       </ol>
     </div>
     <div className={styles.composerWrap}>
-      <div className={styles.typingIndicator} role="status" aria-live="polite">{typingUsers.length > 0 && <><span className={styles.typingDots} aria-hidden="true">•••</span>{typingUsers.map((userId) => memberEmails[userId] ?? '팀원').join(', ')}님이 입력 중…</>}</div>
+      <div className={styles.typingIndicator} role="status" aria-live="polite">{typingUsers.length > 0 && <><span className={styles.typingDots} aria-hidden="true">•••</span>{typingUsers.map((userId) => memberNames[userId] ?? '팀원').join(', ')}님이 입력 중…</>}</div>
       <form className={styles.composer} onSubmit={submit}>
         <textarea aria-label="메시지 입력" value={draft} onChange={(event) => setDraft(key, event.target.value)} onFocus={() => setComposerFocused(true)} onBlur={() => setComposerFocused(false)} onKeyDown={handleKeyDown} maxLength={4000} rows={2} placeholder={`${conversationName}에 메시지 입력`} />
         <button type="submit" disabled={connection !== 'ready' || !draft.trim()}>전송</button>
       </form>
       <div className={styles.composerHint}><span>{connection === 'ready' ? '메시지는 팀원에게 실시간으로 전달됩니다.' : '연결되면 메시지를 보낼 수 있습니다.'}</span><span>Enter 전송 · Shift+Enter 줄바꿈</span></div>
     </div>
-    {taskSource?.messageId && <TaskCreateDialog auth={auth} functions={functions} workspaceId={workspaceId} sourceMessageId={taskSource.messageId} sourceContent={taskSource.content} sourceKind={conversation.kind} memberEmails={memberEmails} onClose={() => setTaskSource(null)} onCreated={() => { setTaskSource(null); setTaskNotice('업무 요청이 저장되었습니다.'); }} />}
+    {taskSource?.messageId && <TaskCreateDialog auth={auth} functions={functions} workspaceId={workspaceId} sourceMessageId={taskSource.messageId} sourceContent={taskSource.content} sourceKind={conversation.kind} memberEmails={memberEmails} memberNames={memberNames} onClose={() => setTaskSource(null)} onCreated={() => { setTaskSource(null); setTaskNotice('업무 요청이 저장되었습니다.'); }} />}
   </section>;
 }

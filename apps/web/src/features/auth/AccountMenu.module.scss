@@ -6,6 +6,7 @@
 .label { margin:0 0 6px; color:#8a94a3; font-size:10px; font-weight:750; }
 .name { display:block; margin-bottom:3px; font-size:13px; }.email { display:block; overflow-wrap:anywhere; margin-bottom:20px; color:#647185; font-size:12px; }
 .providers { margin:0 0 16px; color:#526075; }
+.nameForm { display:grid; gap:7px; margin:0 0 18px; }.nameForm label { color:#485468; font-size:11px; font-weight:750; }.nameForm input { min-height:38px; padding:8px 10px; border:1px solid #dbe0e9; border-radius:7px; background:#fff; color:var(--ink); font:inherit; font-size:12px; }.nameForm input:focus { outline:2px solid #5849c840; border-color:var(--accent); }
 .action,.signOut { width:100%; min-height:37px; padding:8px 10px; border:1px solid #dce1e9; border-radius:7px; background:#fff; color:#526075; cursor:pointer; font:inherit; font-size:11px; font-weight:700; }
 .action:hover,.signOut:hover { border-color:#c9c1ec; background:#f8f6ff; color:var(--accent); }.action:disabled,.signOut:disabled { cursor:wait; opacity:.65; }
 .signOut { margin-top:18px; border-color:#efd5db; color:#a9485c; }

@@ -22,6 +22,26 @@ service cloud.firestore {
       return room.workspaceId == workspaceId && isMember(workspaceId) && request.auth.uid in room.participantIds;
     }
 
+    match /users/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow list, delete: if false;
+      allow create: if signedIn() && request.auth.uid == userId
+        && requiredFields(request.resource.data, ['displayName', 'setupComplete', 'createdAt', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 40
+        && request.resource.data.setupComplete == false
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'setupComplete', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 40
+        && request.resource.data.setupComplete == true
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /users/{userId}/workspaces/{workspaceId} {
       allow get, list: if signedIn() && request.auth.uid == userId;
       allow create: if eligibleCreator() && userId == request.auth.uid
@@ -60,7 +80,12 @@ service cloud.firestore {
           && request.resource.data.role == 'owner'
           && request.resource.data.joinedAt == request.time
           && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == memberId;
-        allow update, delete: if false;
+        allow update: if signedIn() && memberId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() >= 2
+          && request.resource.data.displayName.size() <= 40;
+        allow delete: if false;
       }
     }
 

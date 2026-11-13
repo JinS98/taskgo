@@ -1,5 +1,7 @@
 ﻿.page,.loading { display:grid; place-items:center; min-height:100dvh; padding:24px; background:var(--page); color:var(--ink); }
 .card { width:min(100%,480px); padding:36px; border:1px solid var(--line); border-radius:15px; background:#fff; box-shadow:0 14px 40px #20283812; }
+.emptyWorkspace { width:min(100%,980px); }.emptyHeading { margin-bottom:24px; }.emptyHeading h1 { margin:9px 0; font-size:clamp(26px,4vw,36px); letter-spacing:-.045em; }.emptyHeading p:last-child { color:var(--muted); }.emptyOptions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-bottom:20px; }.emptyOptions .card { width:100%; }.emptyOptions h2 { margin:0; font-size:19px; letter-spacing:-.035em; }.waitingHint { margin:12px 0 0; font-size:12px; }
+.emptyAccount { display:flex; justify-content:flex-end; }
 .card h1 { margin:12px 0; font-size:30px; letter-spacing:-.04em; }.card p { color:var(--muted); line-height:1.6; }
 .eyebrow { color:#8a94a3; font-size:10px; font-weight:800; letter-spacing:.12em; }
 .form { display:grid; gap:9px; margin:20px 0; }.form label { color:#485468; font-size:11px; font-weight:750; }
@@ -36,4 +38,5 @@
 .invites li { justify-content:space-between; }.invites small { display:block; margin-top:3px; color:#8a94a3; }.invites button { flex:0 0 auto; padding:7px 9px; border:1px solid #efd5db; border-radius:7px; background:#fff; color:#a9485c; cursor:pointer; font:inherit; font-size:11px; }
 .localLink { overflow-wrap:anywhere; font-size:12px; }.localLink a { color:var(--accent); }.empty { font-size:12px; }
 @media (max-width:900px) { .managementGrid { grid-template-columns:1fr; } .wideCard { grid-column:auto; } }
+@media (max-width:760px) { .emptyOptions { grid-template-columns:1fr; } .emptyOptions .card { padding:24px; } }
 @media (max-width:650px) { .managementCard { padding:18px; } .workspacePicker > button { min-height:40px; padding:5px 8px; } .pickerIcon { flex-basis:27px; height:27px; } .pickerName { font-size:11px; } }

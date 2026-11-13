@@ -37,7 +37,7 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
   const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
   const liveChat = Boolean(auth && db && functions && workspaceId && userId);
-  const { channels, directMessages, memberEmails, error: conversationError } = useWorkspaceConversations(db, workspaceId, userId);
+  const { channels, directMessages, memberEmails, memberNames, error: conversationError } = useWorkspaceConversations(db, workspaceId, userId);
 
   useEffect(() => {
     if (liveChat && workspaceId) selectConversation({ kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' });
@@ -55,9 +55,9 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   return (
     <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
       {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && functions && workspaceId && userId
-        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} />
+        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} />
         : <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : activeView === 'board' && liveChat && auth && db && functions && workspaceId && userId
-          ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} memberEmails={memberEmails} /> : activeView === 'calendar' && liveChat && db && workspaceId && userId
+          ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} memberNames={memberNames} /> : activeView === 'calendar' && liveChat && db && workspaceId && userId
             ? <TaskCalendarPanel key={workspaceId} db={db} workspaceId={workspaceId} viewerId={userId} /> : currentView && <>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>

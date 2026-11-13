@@ -11,7 +11,7 @@ function localDateTime(date: Date): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId, sourceContent, sourceKind, memberEmails, onClose, onCreated }: {
+export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId, sourceContent, sourceKind, memberEmails, memberNames, onClose, onCreated }: {
   auth: Auth;
   functions: Functions;
   workspaceId: string;
@@ -19,6 +19,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
   sourceContent: string;
   sourceKind: TaskSourceType;
   memberEmails: Record<string, string>;
+  memberNames: Record<string, string>;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -36,7 +37,8 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
   const [suggestionPending, setSuggestionPending] = useState(false);
   const [suggestionError, setSuggestionError] = useState('');
   const [suggestions, setSuggestions] = useState<TaskSuggestionResult | null>(null);
-  const assignees = Object.entries(memberEmails).sort((a, b) => a[1].localeCompare(b[1]));
+  const assignees = Object.keys(memberEmails).sort((a, b) => (memberNames[a] || a).localeCompare(memberNames[b] || b));
+  const assigneeName = (uid: string) => memberNames[uid] || `팀원-${uid.slice(0, 4).toUpperCase()}`;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -117,7 +119,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     <form id="task-create-form" className={styles.form} onSubmit={(event) => void submit(event)}>
       <label className={styles.field}>업무 제목<input ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required placeholder="팀에 공개할 업무 제목" /></label>
       <div className={styles.row}>
-        <label className={styles.field}>담당자<select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required><option value="">담당자를 선택하세요</option>{assignees.map(([uid, email]) => <option key={uid} value={uid}>{email}</option>)}</select></label>
+        <label className={styles.field}>담당자<select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required><option value="">담당자를 선택하세요</option>{assignees.map((uid) => <option key={uid} value={uid}>{assigneeName(uid)}{assignees.some((other) => other !== uid && assigneeName(other) === assigneeName(uid)) ? ` · ${uid.slice(0, 4).toUpperCase()}` : ''}</option>)}</select></label>
         <label className={styles.field}>마감 날짜·시간<input type="datetime-local" value={dueLocal} onChange={(event) => setDueLocal(event.target.value)} min={localDateTime(new Date())} required /></label>
       </div>
       <label className={styles.field}>설명<textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={3} placeholder="업무에 필요한 내용을 적어 주세요" /></label>

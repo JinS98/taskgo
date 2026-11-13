@@ -31,11 +31,21 @@ try {
   assert.equal(services.auth.currentUser, null);
 
   await user.click(screen.getByRole('button', { name: '회원가입' }));
-  await user.type(screen.getByRole('textbox', { name: '이름' }), '테스트 멤버');
   await user.type(screen.getByRole('textbox', { name: '이메일' }), 'member@example.test');
   await user.type(screen.getByLabelText('비밀번호'), 'StrongPass123!');
   await user.click(screen.getByRole('button', { name: '가입하기' }));
+  await screen.findByRole('heading', { name: '이름 등록' }, { timeout: 10000 });
+  assert.match(screen.getByRole('textbox', { name: '이름' }).value, /^팀원-/);
+  await user.clear(screen.getByRole('textbox', { name: '이름' }));
+  await user.type(screen.getByRole('textbox', { name: '이름' }), '테스트 멤버');
+  await user.click(screen.getByRole('button', { name: '이 이름으로 시작하기' }));
   await screen.findByRole('heading', { name: '워크스페이스 만들기' }, { timeout: 10000 });
+  assert.ok(screen.getByRole('heading', { name: '초대로 참여하기' }));
+  await user.type(screen.getByLabelText('초대 링크'), 'https://taskgo.example/invite/sample123?token=sampletoken');
+  await user.click(screen.getByRole('button', { name: '초대 링크로 참여' }));
+  await screen.findByRole('heading', { name: '워크스페이스 초대' });
+  await user.click(screen.getByRole('button', { name: '내 워크스페이스로 이동' }));
+  await screen.findByRole('heading', { name: '워크스페이스 만들기' });
   const passwordUid = services.auth.currentUser.uid;
   assert.equal(services.auth.currentUser.displayName, '테스트 멤버');
   assert.equal(services.auth.currentUser.emailVerified, false);
@@ -67,13 +77,18 @@ try {
   await user.click(screen.getByRole('button', { name: '계정' }));
   assert.match(screen.getByLabelText('계정 설정').textContent, /이메일·비밀번호/);
   assert.match(screen.getByLabelText('계정 설정').textContent, /테스트 멤버/);
+  await user.clear(screen.getByLabelText('표시 이름'));
+  await user.type(screen.getByLabelText('표시 이름'), '변경한 멤버');
+  await user.click(screen.getByRole('button', { name: '이름 저장' }));
+  await screen.findByText('이름을 변경했습니다.');
+  assert.equal(services.auth.currentUser.displayName, '변경한 멤버');
+  await within(screen.getByRole('main')).findByText('변경한 멤버');
   act(() => { useDemoChatStore.getState().setDraft(`${passwordUid}:test:channel:general`, '로그아웃 시 삭제할 초안'); });
   await user.click(screen.getByRole('button', { name: '로그아웃' }));
   await screen.findByRole('button', { name: '이메일로 로그인' });
   assert.deepEqual(useDemoChatStore.getState().draftsByRoom, {});
 
   await user.click(screen.getByRole('button', { name: '회원가입' }));
-  await user.type(screen.getByRole('textbox', { name: '이름' }), '중복 계정');
   await user.type(screen.getByRole('textbox', { name: '이메일' }), 'member@example.test');
   await user.type(screen.getByLabelText('비밀번호'), 'StrongPass123!');
   await user.click(screen.getByRole('button', { name: '가입하기' }));
@@ -88,7 +103,7 @@ try {
   await user.click(screen.getByRole('button', { name: '이메일로 로그인' }));
   await screen.findByRole('heading', { name: '# 전체' }, { timeout: 10000 });
   assert.equal(services.auth.currentUser.uid, passwordUid);
-  assert.equal(services.auth.currentUser.displayName, '테스트 멤버');
+  assert.equal(services.auth.currentUser.displayName, '변경한 멤버');
 
   await act(async () => { await signOut(services.auth); });
   await screen.findByRole('button', { name: '이메일로 로그인' });
@@ -98,6 +113,11 @@ try {
     email_verified: true,
   }));
   await act(async () => { await signInWithCredential(services.auth, googleCredential); });
+  await screen.findByRole('heading', { name: '이름 등록' }, { timeout: 10000 });
+  assert.match(screen.getByRole('textbox', { name: '이름' }).value, /^팀원-/);
+  await user.clear(screen.getByRole('textbox', { name: '이름' }));
+  await user.type(screen.getByRole('textbox', { name: '이름' }), '구글 멤버');
+  await user.click(screen.getByRole('button', { name: '이 이름으로 시작하기' }));
   await screen.findByRole('heading', { name: '워크스페이스 만들기' }, { timeout: 10000 });
   await user.type(screen.getByLabelText('워크스페이스 이름'), 'Google Team');
   await user.click(screen.getByRole('button', { name: '만들기' }));
@@ -109,7 +129,7 @@ try {
   assert.match(screen.getByLabelText('계정 설정').textContent, /Google/);
   assert.equal(screen.queryByLabelText('비밀번호 로그인 추가'), null);
 
-  console.log('Immediate signup with display name, no verification email, workspace creation, password login, and Google session passed.');
+  console.log('First-login name setup, profile editing, no verification email, optional workspace creation, password login, and Google session passed.');
 } finally {
   cleanup();
   if (services) await deleteApp(services.app);

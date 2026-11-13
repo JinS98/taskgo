@@ -67,13 +67,14 @@ async function visibleOnce(page, content) {
 }
 
 try {
-  const owner = await getAuth(admin).createUser({ email: 'live-owner@example.com', password: 'StrongPass123!', emailVerified: true });
-  const member = await getAuth(admin).createUser({ email: 'live-member@example.com', password: 'StrongPass123!', emailVerified: true });
+  const owner = await getAuth(admin).createUser({ email: 'live-owner@example.com', password: 'StrongPass123!', emailVerified: true, displayName: '테스트 방장' });
+  const member = await getAuth(admin).createUser({ email: 'live-member@example.com', password: 'StrongPass123!', emailVerified: true, displayName: '테스트 멤버' });
   const workspaceId = 'live-team';
   const batch = db.batch();
   batch.set(db.doc(`workspaces/${workspaceId}`), { name: 'Live Team', ownerId: owner.uid, createdAt: Timestamp.now() });
   for (const [user, role] of [[owner, 'owner'], [member, 'member']]) {
-    batch.set(db.doc(`workspaces/${workspaceId}/members/${user.uid}`), { uid: user.uid, email: user.email, role, joinedAt: Timestamp.now() });
+    batch.set(db.doc(`users/${user.uid}`), { displayName: user.displayName, setupComplete: true, createdAt: Timestamp.now(), updatedAt: Timestamp.now() });
+    batch.set(db.doc(`workspaces/${workspaceId}/members/${user.uid}`), { uid: user.uid, email: user.email, displayName: user.displayName, role, joinedAt: Timestamp.now() });
     batch.set(db.doc(`users/${user.uid}/workspaces/${workspaceId}`), { workspaceId, name: 'Live Team', role, joinedAt: Timestamp.now() });
   }
   batch.set(db.doc('dmRooms/live-dm'), { workspaceId, participantIds: [owner.uid, member.uid] });
@@ -169,7 +170,7 @@ try {
   });
   await taskDialog.getByLabel('업무 제목').fill('고객 요청 정리');
   await taskDialog.getByLabel('설명').fill('디자인 확인 항목을 정리합니다.');
-  await taskDialog.getByLabel('담당자').selectOption({ label: member.email });
+  await taskDialog.getByLabel('담당자').selectOption({ label: member.displayName });
   await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
   await taskDialog.getByLabel('예상 작업 시간').selectOption('90');
   await taskDialog.getByRole('button', { name: '업무 요청 저장' }).click();
@@ -199,6 +200,9 @@ try {
   await memberPage.getByRole('button', { name: '업무 보드' }).click();
   if (process.env.TASKGO_CAPTURE_UI) await memberPage.screenshot({ path: resolve(root, '.tmp-ui-board.png') });
   const memberTaskCard = memberPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
+  await memberTaskCard.getByText('요청 테스트 방장').waitFor();
+  await memberTaskCard.getByText('담당 테스트 멤버').waitFor();
+  assert.equal(await memberTaskCard.getByText(/@example\.com/).count(), 0);
   await memberTaskCard.getByRole('button', { name: '마감 변경 제안' }).click();
   const proposedLocal = await memberPage.evaluate(() => {
     const nextDate = new Date(Date.now() + 2 * 86400000);
@@ -247,14 +251,14 @@ try {
   await send(memberPage, 'member channel reply');
   await visibleOnce(ownerPage, 'member channel reply');
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('typing in channel');
-  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor();
+  await memberPage.getByText('테스트 방장님이 입력 중…').waitFor();
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('');
-  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor({ state: 'hidden' });
+  await memberPage.getByText('테스트 방장님이 입력 중…').waitFor({ state: 'hidden' });
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('typing before outage');
-  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor();
+  await memberPage.getByText('테스트 방장님이 입력 중…').waitFor();
   await ownerPage.context().setOffline(true);
   await ownerPage.getByText('오프라인').waitFor({ timeout: 10000 });
-  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor({ state: 'hidden', timeout: 10000 });
+  await memberPage.getByText('테스트 방장님이 입력 중…').waitFor({ state: 'hidden', timeout: 10000 });
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('owner draft after outage');
   assert.equal(await ownerPage.getByRole('button', { name: '전송', exact: true }).isDisabled(), true);
   for (let index = 0; index < 35; index += 1) {
@@ -275,8 +279,8 @@ try {
   await ownerPage.goto(`${origin}/workspace`);
   await visibleOnce(ownerPage, 'message while owner away');
 
-  await ownerPage.getByRole('button', { name: member.email }).click();
-  await memberPage.getByRole('button', { name: owner.email }).click();
+  await ownerPage.getByRole('button', { name: member.displayName }).click();
+  await memberPage.getByRole('button', { name: owner.displayName }).click();
   await visibleOnce(ownerPage, 'earlier direct message');
   await visibleOnce(memberPage, 'earlier direct message');
   await ownerPage.getByRole('listitem').filter({ hasText: 'earlier direct message' }).getByRole('button', { name: '업무 요청' }).click();
@@ -287,7 +291,7 @@ try {
   await taskDialog.getByRole('button', { name: /earlier direct message/ }).click();
   assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), 'earlier direct message');
   await taskDialog.getByLabel('업무 제목').fill('비공개 대화 후속 업무');
-  await taskDialog.getByLabel('담당자').selectOption({ label: member.email });
+  await taskDialog.getByLabel('담당자').selectOption({ label: member.displayName });
   await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
   await taskDialog.getByLabel('완료 후 검수 요청').check();
   await taskDialog.getByLabel('검수 기간').selectOption('2');
@@ -307,7 +311,7 @@ try {
   await ownerPage.getByRole('listitem').filter({ hasText: 'earlier direct message' }).getByRole('button', { name: '업무 요청' }).click();
   taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
   await taskDialog.getByLabel('업무 제목').fill('검수 요청 업무');
-  await taskDialog.getByLabel('담당자').selectOption({ label: member.email });
+  await taskDialog.getByLabel('담당자').selectOption({ label: member.displayName });
   await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
   await taskDialog.getByLabel('완료 후 검수 요청').check();
   await taskDialog.getByLabel('검수 기간').selectOption('2');
@@ -351,9 +355,9 @@ try {
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await memberPage.getByText('실시간 연결됨').waitFor();
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('typing in DM');
-  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor();
+  await memberPage.getByText('테스트 방장님이 입력 중…').waitFor();
   await ownerPage.getByRole('textbox', { name: '메시지 입력' }).fill('');
-  await memberPage.getByText('live-owner@example.com님이 입력 중…').waitFor({ state: 'hidden' });
+  await memberPage.getByText('테스트 방장님이 입력 중…').waitFor({ state: 'hidden' });
   await send(ownerPage, 'owner direct message');
   await visibleOnce(memberPage, 'owner direct message');
   await ownerPage.getByRole('button', { name: '전체' }).click();
@@ -361,7 +365,7 @@ try {
   await send(memberPage, 'member direct reply');
   await visibleOnce(memberPage, 'member direct reply');
   assert.equal(await ownerPage.getByText('member direct reply', { exact: true }).count(), 0, 'DM leaked into channel view.');
-  await ownerPage.getByRole('button', { name: member.email }).click();
+  await ownerPage.getByRole('button', { name: member.displayName }).click();
   await visibleOnce(ownerPage, 'owner direct message');
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await ownerPage.reload();

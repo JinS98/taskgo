@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { collection, onSnapshot, type Firestore } from 'firebase/firestore';
 import type { Auth, User } from 'firebase/auth';
 import type { Functions } from 'firebase/functions';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import App from '../../App';
 import { AccountMenu } from '../auth/AccountMenu';
 import { useWorkspaceNavigationStore } from '../../store/useWorkspaceNavigationStore';
@@ -17,8 +17,9 @@ function PickerMark() {
   return <svg className={styles.pickerMark} aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 7.5 5 5 5-5" /></svg>;
 }
 
-export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: Auth; user: User; db: Firestore; functions: Functions; onRefresh: () => Promise<void> }) {
+export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveName, onRefresh }: { auth: Auth; user: User; db: Firestore; functions: Functions; displayName: string; onSaveName: (name: string) => Promise<void>; onRefresh: () => Promise<void> }) {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const selectedWorkspaceIdRef = useRef('');
   const pickerRef = useRef<HTMLDivElement>(null);
   const pickerButtonRef = useRef<HTMLButtonElement>(null);
@@ -32,6 +33,8 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
   const [name, setName] = useState('');
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+  const [linkError, setLinkError] = useState('');
   const [members, setMembers] = useState<Member[]>([]);
   const [membersWorkspaceId, setMembersWorkspaceId] = useState('');
   const [membersError, setMembersError] = useState('');
@@ -123,6 +126,18 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
     finally { setPending(false); }
   }
 
+  function joinWithLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const url = new URL(inviteLink.trim(), window.location.origin);
+      const token = url.searchParams.get('token');
+      if (!/^\/invite\/[A-Za-z0-9]+$/.test(url.pathname) || !token || !/^[A-Za-z0-9_-]+$/.test(token)) throw new Error();
+      navigate(`${url.pathname}?token=${token}`);
+    } catch {
+      setLinkError('초대 메일에 있는 올바른 링크를 붙여 넣어 주세요.');
+    }
+  }
+
   async function revoke(inviteId: string) {
     if (!selected || pending) return;
     setPending(true); setInviteActionError('');
@@ -163,24 +178,39 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
 
   if (!selected) return (
     <main className={styles.page}>
-      <section className={styles.card}>
-        <p className={styles.eyebrow}>TASKGO WORKSPACE</p>
-        <h1>워크스페이스 만들기</h1>
-        <p>팀의 공간을 만들면 워크스페이스 장이 됩니다.</p>
-        <form onSubmit={create} className={styles.form}>
-          <label htmlFor="workspace-name">워크스페이스 이름</label>
-          <input id="workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={pending} />
-          <button type="submit" disabled={pending}>{pending ? '만드는 중…' : '만들기'}</button>
-        </form>
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <AccountMenu auth={auth} user={user} onRefresh={onRefresh} />
-      </section>
+      <div className={styles.emptyWorkspace}>
+        <div className={styles.emptyHeading}><p className={styles.eyebrow}>TASKGO WORKSPACE</p><h1>워크스페이스에 들어가기</h1><p>새 공간을 만들거나, 팀에서 받은 초대 링크로 참여하세요.</p></div>
+        <div className={styles.emptyOptions}>
+          <section className={styles.card}>
+            <h2>워크스페이스 만들기</h2>
+            <p>팀의 공간을 만들면 워크스페이스 장이 됩니다.</p>
+            <form onSubmit={create} className={styles.form}>
+              <label htmlFor="workspace-name">워크스페이스 이름</label>
+              <input id="workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={pending} />
+              <button type="submit" disabled={pending}>{pending ? '만드는 중…' : '만들기'}</button>
+            </form>
+            {error && <p className={styles.error} role="alert">{error}</p>}
+          </section>
+          <section className={styles.card}>
+            <h2>초대로 참여하기</h2>
+            <p>초대받은 이메일로 로그인한 상태입니다. 메일의 링크를 열거나 아래에 붙여 넣으세요.</p>
+            <form className={styles.form} onSubmit={joinWithLink}>
+              <label htmlFor="invite-link">초대 링크</label>
+              <input id="invite-link" type="url" value={inviteLink} onChange={(event) => { setInviteLink(event.target.value); setLinkError(''); }} placeholder="https://…/invite/…?token=…" required />
+              <button type="submit">초대 링크로 참여</button>
+            </form>
+            {linkError && <p className={styles.error} role="alert">{linkError}</p>}
+            <p className={styles.waitingHint}>아직 초대 메일이 없다면 이 화면에서 기다려도 됩니다. 워크스페이스를 만들 필요는 없습니다.</p>
+          </section>
+        </div>
+        <div className={styles.emptyAccount}><AccountMenu auth={auth} user={user} displayName={displayName} onSaveName={onSaveName} onRefresh={onRefresh} /></div>
+      </div>
     </main>
   );
 
   return (
     <div className={styles.shell}>
-      <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={user.displayName || user.email || '나'} canManageWorkspace={selected.role === 'owner'} workspaceControls={
+      <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={displayName} canManageWorkspace={selected.role === 'owner'} workspaceControls={
         <div className={styles.workspacePicker} ref={pickerRef}>
           <button ref={pickerButtonRef} type="button" aria-label="워크스페이스 선택" aria-expanded={pickerOpen} aria-controls="workspace-options" onClick={() => setPickerOpen((open) => !open)}>
             <span className={styles.pickerIcon} aria-hidden="true">{selected.name.charAt(0).toUpperCase()}</span>
@@ -194,7 +224,7 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
             </button>)}
           </div>}
         </div>
-      } accountControls={<AccountMenu auth={auth} user={user} onRefresh={onRefresh} />} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
+      } accountControls={<AccountMenu auth={auth} user={user} displayName={displayName} onSaveName={onSaveName} onRefresh={onRefresh} />} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
         <div className={styles.managementHeading}><p className={styles.eyebrow}>WORKSPACE</p><h1>{selected.name} 관리</h1><p>멤버와 초대 현황을 확인하고 새 멤버를 초대하세요.</p></div>
         <div className={styles.managementGrid}>
           <section className={styles.managementCard} aria-labelledby="invite-title"><div className={styles.cardHeading}><h2 id="invite-title">멤버 초대</h2></div><p className={styles.helper}>이메일 주소로 초대 링크를 보냅니다. 상대방은 같은 주소로 로그인해 수락할 수 있습니다.</p>
@@ -209,7 +239,7 @@ export function WorkspaceGate({ auth, user, db, functions, onRefresh }: { auth: 
           </section>
           <section className={`${styles.managementCard} ${styles.wideCard}`} aria-labelledby="members-title"><div className={styles.cardHeading}><h2 id="members-title">워크스페이스 멤버</h2><span>{membersWorkspaceId === selected.workspaceId ? members.length : 0}명</span></div>
             {membersError && <p className={styles.error} role="alert">{membersError}</p>}
-            {!membersError && (membersWorkspaceId === selected.workspaceId ? <ul className={styles.members}>{members.map((member) => <li key={member.uid}><span className={styles.memberAvatar} aria-hidden="true">{(member.displayName || member.email).charAt(0).toUpperCase()}</span><span className={styles.memberIdentity}>{member.displayName || member.email}<small>{member.displayName ? `${member.email} · ` : ''}{member.role === 'owner' ? '워크스페이스 장' : '멤버'}</small></span></li>)}</ul> : <p className={styles.empty}>멤버를 불러오는 중입니다…</p>)}
+            {!membersError && (membersWorkspaceId === selected.workspaceId ? <ul className={styles.members}>{members.map((member) => { const name = member.displayName || `팀원-${member.uid.slice(0, 4).toUpperCase()}`; return <li key={member.uid}><span className={styles.memberAvatar} aria-hidden="true">{name.charAt(0).toUpperCase()}</span><span className={styles.memberIdentity}>{name}<small>{member.email} · {member.role === 'owner' ? '워크스페이스 장' : '멤버'}</small></span></li>; })}</ul> : <p className={styles.empty}>멤버를 불러오는 중입니다…</p>)}
           </section>
         </div>
       </div>} />
