@@ -14,12 +14,13 @@ export interface CreateTaskRequest {
   estimatedMinutes?: number | null;
 }
 
-export type TaskRequestAction = 'accept' | 'decline' | 'startProgress' | 'proposeDueDate' | 'approveDueDate' | 'rejectDueDate' | 'submitForReview';
+export type TaskRequestAction = 'accept' | 'decline' | 'startProgress' | 'proposeDueDate' | 'approveDueDate' | 'rejectDueDate' | 'submitForReview' | 'complete' | 'approveReview' | 'rejectReview' | 'resubmitForReview';
 
 export interface RespondToTaskRequest {
   taskId: string;
   action: TaskRequestAction;
   proposedDueDate?: string;
+  rejectionReason?: string;
 }
 
 export interface TaskEventRecord<TimestampValue> {
@@ -33,6 +34,8 @@ export interface TaskEventRecord<TimestampValue> {
     dueDate?: string;
     reviewCycle?: number;
     reviewWorkingDays?: number;
+    rejectionReason?: string;
+    completionReason?: TaskCompletionReason;
   };
 }
 
@@ -52,6 +55,7 @@ export interface TaskRecord<TimestampValue> {
   reviewWorkingDays: number | null;
   reviewCycle: number;
   reviewSubmittedAt?: TimestampValue | null;
+  reviewRejectionReason?: string | null;
   reviewDeadlineAt: TimestampValue | null;
   completionReason: TaskCompletionReason | null;
   createdAt: TimestampValue;

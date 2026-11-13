@@ -329,6 +329,23 @@ try {
   await requesterReviewCard.getByRole('button', { name: '이력 보기' }).click();
   await requesterReviewCard.getByText('검수 요청 제출', { exact: true }).waitFor();
   await requesterReviewCard.getByText('검수 기간 2근무일 · 1회차').waitFor();
+  await requesterReviewCard.getByRole('button', { name: '반려하기' }).click();
+  await requesterReviewCard.getByLabel('반려 사유').fill('검수 항목을 다시 확인해 주세요.');
+  await requesterReviewCard.getByRole('button', { name: '반려 사유 보내기' }).click();
+  await requesterReviewCard.getByText('재작업 요청됨').waitFor();
+  await reviewTaskCard.getByText('검수 항목을 다시 확인해 주세요.').waitFor();
+  assert.equal((await db.doc(`tasks/${reviewTask.id}`).get()).get('status'), 'REWORK');
+  await reviewTaskCard.getByRole('button', { name: '재제출' }).click();
+  await requesterReviewCard.getByText('검수 요청됨').waitFor();
+  await requesterReviewCard.getByText('검수 재제출', { exact: true }).waitFor();
+  assert.equal((await db.doc(`tasks/${reviewTask.id}`).get()).get('reviewCycle'), 2);
+  await requesterReviewCard.getByRole('button', { name: '검수 승인' }).click();
+  await requesterReviewCard.getByText('요청자가 검수를 승인했습니다.').waitFor();
+  assert.equal((await db.doc(`tasks/${reviewTask.id}`).get()).get('completionReason'), 'APPROVED');
+  const noReviewTaskCard = memberPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
+  await noReviewTaskCard.getByRole('button', { name: '완료하기' }).click();
+  await noReviewTaskCard.getByText('검수 없이 완료한 업무입니다.').waitFor();
+  assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('completionReason'), 'NO_REVIEW');
   await ownerPage.getByRole('button', { name: '채팅' }).click();
   await memberPage.getByRole('button', { name: '채팅' }).click();
   await ownerPage.getByText('실시간 연결됨').waitFor();
@@ -352,7 +369,7 @@ try {
   await visibleOnce(ownerPage, 'offline gap 34');
   assert.ok((await db.collection('messages').get()).size >= 70);
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions verified task creation, progress, deadline negotiation, review submission, history, and live messages.');
+  console.log('PASS: two Chrome sessions verified task progress, review rejection and resubmission, approval, no-review completion, and live messages.');
 } finally {
   await browser?.close();
   await vite?.close();

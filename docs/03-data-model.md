@@ -9,7 +9,7 @@
 - `channels/{channelId}`: workspaceId, name. 8일차 규칙은 워크스페이스 전체 공개 채널만 지원한다.
 - `dmRooms/{roomId}`: workspaceId, participantIds
 - `messages/{messageId}`: workspaceId, sourceType(channel/dm), channelId 또는 dmRoomId, senderId, clientMessageId, content, createdAt. 서버가 사용자 UID와 `clientMessageId`로 결정한 ID에 트랜잭션으로 한 번만 생성한다. `createdAt`은 소켓 서버가 생성한 Firestore Timestamp다. 같은 사용자의 클라이언트 ID는 룸과 워크스페이스를 통틀어 고유해야 한다.
-- `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType(channel/dm), title, description, requesterId, assigneeId, dueDate, proposedDueDate, estimatedMinutes, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewSubmittedAt, reviewDeadlineAt, completionReason, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp이며, 미확정 값은 null이다. 타입 계약은 `shared/contracts/src/task.ts`에 둔다.
+- `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType(channel/dm), title, description, requesterId, assigneeId, dueDate, proposedDueDate, estimatedMinutes, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewSubmittedAt, reviewRejectionReason, reviewDeadlineAt, completionReason, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp이며, 미확정 값은 null이다. 타입 계약은 `shared/contracts/src/task.ts`에 둔다.
 - `taskEvents/{eventId}`: taskId, actorId, action, createdAt, metadata
 - `notifications/{id}`: recipientId, taskId, reviewCycle, type, scheduledAt, sentAt
 - `meetings/{id}`: workspaceId, title, startsAt, endsAt
@@ -41,6 +41,13 @@
 - 검수 대상 업무의 담당자만 `IN_PROGRESS`에서 `submitForReview`를 호출할 수 있다. 대기 중인 마감 제안이 있거나 검수 기간 설정이 유효하지 않으면 거부한다.
 - 서버는 업무 상태를 `REVIEW_PENDING`으로, 검수 회차를 `1`로 바꾸고 `reviewSubmittedAt`에 제출 시각을 기록한다. 같은 트랜잭션에서 `taskEvents`에 제출 이벤트와 선택된 검수 기간을 남긴다. 중복 제출은 상태 검사로 거부한다.
 - `reviewDeadlineAt`은 24일차 근무시간·공휴일 계산에서 설정한다. 현재 보드에는 제출 시각과 선택한 기간을 표시한다.
+
+## 검수 승인·재작업 (23일차)
+
+- 검수 미선택 업무는 담당자가 `IN_PROGRESS`에서 `complete`를 호출해 `DONE`으로 완료한다. `completionReason`은 `NO_REVIEW`다. 마감 변경 제안이 남아 있으면 완료할 수 없다.
+- 검수 대기(`REVIEW_PENDING`) 업무는 요청자만 승인 또는 사유를 포함해 반려한다. `approveReview`는 `DONE`과 `completionReason=APPROVED`로, `rejectReview`는 `REWORK`와 `reviewRejectionReason`으로 기록한다. 반려 사유는 공백을 제외해 2~1000자로 검증한다.
+- 담당자만 `REWORK`에서 `resubmitForReview`를 호출할 수 있다. 재제출 시 `REVIEW_PENDING`으로 돌아가 검수 회차를 올리고 제출 시각을 갱신하며 반려 사유를 지운다. 이후 요청자는 다시 승인·반려할 수 있다. 모든 전이와 이력 이벤트는 같은 트랜잭션으로 저장한다.
+- 검수 회차는 향후 예약 알림 구분에 사용한다. 검수 기한의 근무시간·공휴일 계산과 예약 알림은 아직 연결되지 않았으며 24일차 이후 범위다.
 
 ## 권한
 - 워크스페이스 장만 초대를 발송·철회·조회한다. 초대 수락은 서버 트랜잭션에서 로그인 이메일 확인 여부·초대 이메일 일치·토큰 해시·만료·사용 여부·멤버십 중복을 검증하고 멤버십·목록 미러·초대 상태를 한 번에 기록한다. 초대 기한은 7일이다.

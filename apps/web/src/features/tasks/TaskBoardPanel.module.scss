@@ -19,6 +19,8 @@
 .cardTop { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:7px; }
 .status { display:inline-block; padding:4px 7px; border-radius:5px; background:#e7f5f1; color:#187765; font-size:10px; font-weight:750; }
 .status.requested { background:var(--accent-soft); color:var(--accent); }
+.status.reviewPending { background:#eef5ff; color:#3865a2; }
+.status.rework { background:#fff1f2; color:#a9485c; }
 .due { color:#909baa; font-size:10px; }
 .card h2 { margin:11px 0 9px; color:var(--ink); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
 .description { display:-webkit-box; margin:0 0 10px; overflow:hidden; color:#677284; font-size:11px; line-height:1.5; overflow-wrap:anywhere; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
@@ -28,6 +30,8 @@
 .reviewInfo { display:grid; gap:4px; margin-top:13px; padding:10px; border:1px solid #d9e7e1; border-radius:7px; background:#f3faf7; color:#2b6959; font-size:11px; line-height:1.45; }
 .reviewInfo strong { font-size:11px; }
 .reviewInfo small { color:#5d8b7d; font-size:10px; }
+.reworkInfo { border-color:#efd5db; background:#fff8f8; color:#994357; }
+.reworkInfo small { color:#ae7681; }
 .actions { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:14px; }
 .actions button,.proposeForm button { min-height:32px; padding:7px 9px; border:1px solid #dce1e9; border-radius:7px; background:#fff; color:#526075; cursor:pointer; font:inherit; font-size:10px; font-weight:750; }
 .actions button:hover,.proposeForm button:hover { background:#f7f8fb; }
@@ -39,6 +43,12 @@
 .proposeForm { display:flex; align-items:end; flex-wrap:wrap; gap:8px; margin-top:11px; }
 .proposeForm label { display:grid; gap:6px; color:#526075; font-size:10px; font-weight:700; }
 .proposeForm input { min-height:34px; max-width:100%; padding:6px 8px; border:1px solid #dbe0e9; border-radius:7px; background:#fff; color:var(--ink); font:inherit; font-size:11px; }
+.rejectionForm { display:grid; gap:8px; margin-top:11px; }
+.rejectionForm label { display:grid; gap:6px; color:#526075; font-size:10px; font-weight:700; }
+.rejectionForm textarea { width:100%; min-height:72px; padding:8px 10px; border:1px solid #dbe0e9; border-radius:7px; background:#fff; color:var(--ink); font:inherit; font-size:11px; line-height:1.5; resize:vertical; }
+.rejectionForm textarea:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.rejectionForm button { justify-self:start; min-height:32px; padding:7px 9px; border:1px solid #efd5db; border-radius:7px; background:#fff; color:#a9485c; cursor:pointer; font:inherit; font-size:10px; font-weight:750; }
+.rejectionForm button:disabled { cursor:not-allowed; opacity:.55; }
 .historyToggle { margin-top:12px; padding:5px 0; border:0; background:transparent; color:var(--accent); cursor:pointer; font:inherit; font-size:10px; font-weight:750; }
 .historyToggle:hover { text-decoration:underline; text-underline-offset:3px; }
 .historyToggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }

@@ -262,8 +262,10 @@ try {
   await assignee.respond({ taskId: reviewTaskId, action: 'accept' });
   await rejected(assignee.respond(submitReview), 'failed-precondition');
   await assignee.respond({ taskId: reviewTaskId, action: 'startProgress' });
+  await rejected(assignee.respond({ taskId: reviewTaskId, action: 'complete' }), 'failed-precondition');
   await assignee.respond({ taskId: reviewTaskId, action: 'proposeDueDate', proposedDueDate: progressDue });
   await rejected(assignee.respond(submitReview), 'failed-precondition');
+  await rejected(assignee.respond({ taskId: reviewTaskId, action: 'complete' }), 'failed-precondition');
   await owner.respond({ taskId: reviewTaskId, action: 'rejectDueDate' });
   const submissions = await Promise.allSettled([assignee.respond(submitReview), assignee.respond(submitReview)]);
   assert.equal(submissions.filter((result) => result.status === 'fulfilled').length, 1);
@@ -285,7 +287,54 @@ try {
   assert.equal(submitEvent.get('metadata.reviewWorkingDays'), 2);
   assert.equal((await adminDb.collection('taskEvents').get()).size, 21);
 
-  console.log('PASS: task schema, permissions, request and progress transitions, deadline approvals, review submission, and history.');
+  await rejected(assignee.respond({ taskId: reviewTaskId, action: 'approveReview' }), 'permission-denied');
+  await rejected(outsider.respond({ taskId: reviewTaskId, action: 'rejectReview', rejectionReason: '수정 요청' }), 'permission-denied');
+  await rejected(owner.respond({ taskId: reviewTaskId, action: 'rejectReview' }), 'invalid-argument');
+  await rejected(owner.respond({ taskId: reviewTaskId, action: 'rejectReview', rejectionReason: ' ' }), 'invalid-argument');
+  await rejected(owner.respond({ taskId: reviewTaskId, action: 'rejectReview', rejectionReason: '가'.repeat(1001) }), 'invalid-argument');
+  await rejected(assignee.respond({ taskId: reviewTaskId, action: 'resubmitForReview' }), 'failed-precondition');
+  await owner.respond({ taskId: reviewTaskId, action: 'rejectReview', rejectionReason: '  수정할 내용이 있습니다.  ' });
+  const reworkTask = await adminDb.doc(`tasks/${reviewTaskId}`).get();
+  assert.equal(reworkTask.get('status'), 'REWORK');
+  assert.equal(reworkTask.get('reviewCycle'), 1);
+  assert.equal(reworkTask.get('reviewRejectionReason'), '수정할 내용이 있습니다.');
+  assert.equal(reworkTask.get('reviewDeadlineAt'), null);
+  assert.equal(reworkTask.get('completionReason'), null);
+  await rejected(owner.respond({ taskId: reviewTaskId, action: 'resubmitForReview' }), 'permission-denied');
+  await rejected(owner.respond({ taskId: reviewTaskId, action: 'approveReview' }), 'failed-precondition');
+  await assignee.respond({ taskId: reviewTaskId, action: 'resubmitForReview' });
+  const resubmittedTask = await adminDb.doc(`tasks/${reviewTaskId}`).get();
+  assert.equal(resubmittedTask.get('status'), 'REVIEW_PENDING');
+  assert.equal(resubmittedTask.get('reviewCycle'), 2);
+  assert.equal(resubmittedTask.get('reviewRejectionReason'), null);
+  assert.ok(resubmittedTask.get('reviewSubmittedAt') instanceof Timestamp);
+  assert.equal(resubmittedTask.get('reviewDeadlineAt'), null);
+  const approvals = await Promise.allSettled([
+    owner.respond({ taskId: reviewTaskId, action: 'approveReview' }),
+    owner.respond({ taskId: reviewTaskId, action: 'approveReview' }),
+  ]);
+  assert.equal(approvals.filter((result) => result.status === 'fulfilled').length, 1);
+  assert.equal(approvals.filter((result) => result.status === 'rejected' && result.reason.code === 'functions/failed-precondition').length, 1);
+  const approvedTask = await adminDb.doc(`tasks/${reviewTaskId}`).get();
+  assert.equal(approvedTask.get('status'), 'DONE');
+  assert.equal(approvedTask.get('completionReason'), 'APPROVED');
+  assert.equal(approvedTask.get('reviewCycle'), 2);
+  await rejected(owner.respond({ taskId: reviewTaskId, action: 'rejectReview', rejectionReason: '다시 반려' }), 'failed-precondition');
+
+  await rejected(owner.respond({ taskId: channelTaskId, action: 'complete' }), 'permission-denied');
+  await rejected(assignee.respond({ taskId: channelTaskId, action: 'approveReview' }), 'permission-denied');
+  await assignee.respond({ taskId: channelTaskId, action: 'complete' });
+  const completedTask = await adminDb.doc(`tasks/${channelTaskId}`).get();
+  assert.equal(completedTask.get('status'), 'DONE');
+  assert.equal(completedTask.get('completionReason'), 'NO_REVIEW');
+  await rejected(assignee.respond({ taskId: channelTaskId, action: 'complete' }), 'failed-precondition');
+  const reviewHistory = await getDocs(query(collection(owner.db, 'taskEvents'), where('taskId', '==', reviewTaskId)));
+  assert.equal(reviewHistory.docs.filter((event) => event.get('action') === 'rejectReview').length, 1);
+  assert.equal(reviewHistory.docs.find((event) => event.get('action') === 'rejectReview')?.get('metadata.rejectionReason'), '수정할 내용이 있습니다.');
+  assert.equal(reviewHistory.docs.find((event) => event.get('action') === 'resubmitForReview')?.get('metadata.reviewCycle'), 2);
+  assert.equal((await adminDb.collection('taskEvents').get()).size, 25);
+
+  console.log('PASS: task schema, permissions, progress, review rejection and resubmission, approval, no-review completion, and history.');
 } finally {
   for (const app of apps) await deleteApp(app);
   await deleteAdminApp(admin);

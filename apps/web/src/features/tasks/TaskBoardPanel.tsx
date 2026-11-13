@@ -21,6 +21,7 @@ const eventLabels: Record<TaskRequestAction, string> = {
   accept: '업무 요청 수락', decline: '업무 요청 거절', startProgress: '업무 진행 시작',
   proposeDueDate: '마감 변경 제안', approveDueDate: '마감 변경 승인', rejectDueDate: '마감 변경 거절',
   submitForReview: '검수 요청 제출',
+  complete: '업무 완료', approveReview: '검수 승인', rejectReview: '검수 반려', resubmitForReview: '검수 재제출',
 };
 
 function formatDate(value: Timestamp | null): string {
@@ -52,6 +53,8 @@ function TaskHistory({ db, task, memberEmails }: { db: Firestore; task: BoardTas
         {event.action === 'proposeDueDate' && event.metadata.proposedDueDate && <small>제안 {formatDate(Timestamp.fromDate(new Date(event.metadata.proposedDueDate)))}</small>}
         {event.action === 'approveDueDate' && event.metadata.dueDate && <small>확정 {formatDate(Timestamp.fromDate(new Date(event.metadata.dueDate)))}</small>}
         {event.action === 'submitForReview' && event.metadata.reviewWorkingDays && <small>검수 기간 {event.metadata.reviewWorkingDays}근무일 · {event.metadata.reviewCycle}회차</small>}
+        {event.action === 'resubmitForReview' && event.metadata.reviewWorkingDays && <small>검수 기간 {event.metadata.reviewWorkingDays}근무일 · {event.metadata.reviewCycle}회차</small>}
+        {event.action === 'rejectReview' && event.metadata.rejectionReason && <small>사유: {event.metadata.rejectionReason}</small>}
       </li>)}
     </ol>}
   </div>;
@@ -66,20 +69,24 @@ function TaskCard({ task, auth, db, functions, viewerId, memberEmails, onNotice 
   const [dueLocal, setDueLocal] = useState('');
   const [showProposal, setShowProposal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showRejection, setShowRejection] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
   const isAssignee = task.assigneeId === viewerId;
   const isRequester = task.requesterId === viewerId;
   const requested = task.status === 'REQUESTED';
   const negotiable = requested || task.status === 'ACCEPTED' || task.status === 'IN_PROGRESS';
 
-  async function act(action: TaskRequestAction, proposedDueDate?: string) {
+  async function act(action: TaskRequestAction, proposedDueDate?: string, reason?: string) {
     if (pending) return;
     setPending(true);
     setError('');
     try {
-      await respondTask(auth, functions, { taskId: task.id, action, ...(proposedDueDate ? { proposedDueDate } : {}) });
+      await respondTask(auth, functions, { taskId: task.id, action, ...(proposedDueDate ? { proposedDueDate } : {}), ...(reason ? { rejectionReason: reason } : {}) });
       setShowProposal(false);
+      setShowRejection(false);
+      setRejectionReason('');
       setDueLocal('');
-      onNotice({ accept: '업무 요청을 수락했습니다.', decline: '업무 요청을 거절했습니다.', startProgress: '업무 진행을 시작했습니다.', proposeDueDate: '마감 변경을 제안했습니다.', approveDueDate: '제안한 마감일을 승인했습니다.', rejectDueDate: '마감 변경 제안을 거절했습니다.', submitForReview: '검수를 요청했습니다.' }[action]);
+      onNotice({ accept: '업무 요청을 수락했습니다.', decline: '업무 요청을 거절했습니다.', startProgress: '업무 진행을 시작했습니다.', proposeDueDate: '마감 변경을 제안했습니다.', approveDueDate: '제안한 마감일을 승인했습니다.', rejectDueDate: '마감 변경 제안을 거절했습니다.', submitForReview: '검수를 요청했습니다.', complete: '업무를 완료했습니다.', approveReview: '검수를 승인했습니다.', rejectReview: '검수를 반려했습니다.', resubmitForReview: '검수를 다시 요청했습니다.' }[action]);
     } catch (cause) {
       setError(taskResponseError(cause));
     } finally {
@@ -93,21 +100,39 @@ function TaskCard({ task, auth, db, functions, viewerId, memberEmails, onNotice 
     void act('proposeDueDate', new Date(millis).toISOString());
   }
 
+  function rejectReview() {
+    const reason = rejectionReason.trim();
+    if (reason.length < 2 || reason.length > 1000) { setError('반려 사유는 2~1000자로 입력해 주세요.'); return; }
+    void act('rejectReview', undefined, reason);
+  }
+
   return <article className={styles.card}>
-    <div className={styles.cardTop}><span className={`${styles.status} ${task.status === 'REQUESTED' ? styles.requested : ''}`}>{statusLabels[task.status]}</span><span className={styles.due}>마감 {formatDate(task.dueDate)}</span></div>
+    <div className={styles.cardTop}><span className={`${styles.status} ${task.status === 'REQUESTED' ? styles.requested : task.status === 'REWORK' ? styles.rework : task.status === 'REVIEW_PENDING' ? styles.reviewPending : ''}`}>{statusLabels[task.status]}</span><span className={styles.due}>마감 {formatDate(task.dueDate)}</span></div>
     <h2>{task.title}</h2>
     {task.description && <p className={styles.description}>{task.description}</p>}
     <div className={styles.meta}><span>요청 {memberEmails[task.requesterId] ?? '멤버'}</span><span>담당 {memberEmails[task.assigneeId] ?? '멤버'}</span>{task.estimatedMinutes && <span>예상 {task.estimatedMinutes}분</span>}{task.reviewRequired && <span>검수 {task.reviewWorkingDays}근무일</span>}</div>
     {task.proposedDueDate && <div className={styles.proposal}><strong>제안된 마감</strong><span>{formatDate(task.proposedDueDate)}</span><small>요청자가 승인하기 전까지 기존 마감일이 유지됩니다.</small></div>}
     {task.status === 'REVIEW_PENDING' && <div className={styles.reviewInfo}><strong>검수 요청됨</strong><span>{isRequester ? '담당자가 검수를 요청했습니다.' : '요청자의 검수를 기다리는 중입니다.'}</span><small>{task.reviewSubmittedAt && `제출 ${formatDate(task.reviewSubmittedAt)} · `}검수 기간 {task.reviewWorkingDays}근무일</small></div>}
+    {task.status === 'REWORK' && <div className={`${styles.reviewInfo} ${styles.reworkInfo}`}><strong>재작업 요청됨</strong><span>{task.reviewRejectionReason ?? '요청자의 반려 사유를 확인해 주세요.'}</span><small>{task.reviewCycle}회차 검수 반려</small></div>}
+    {task.status === 'DONE' && <div className={styles.reviewInfo}><strong>완료됨</strong><span>{task.completionReason === 'APPROVED' ? '요청자가 검수를 승인했습니다.' : '검수 없이 완료한 업무입니다.'}</span></div>}
     {isAssignee && negotiable && <div className={styles.actions}>
       {requested && !task.proposedDueDate && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('accept')}>수락</button>}
       {task.status === 'ACCEPTED' && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('startProgress')}>진행 시작</button>}
       {task.status === 'IN_PROGRESS' && task.reviewRequired && !task.proposedDueDate && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('submitForReview')}>검수 요청</button>}
+      {task.status === 'IN_PROGRESS' && !task.reviewRequired && !task.proposedDueDate && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('complete')}>완료하기</button>}
       {!task.proposedDueDate && <button type="button" disabled={pending} onClick={() => setShowProposal((value) => !value)}>마감 변경 제안</button>}
       {requested && <button type="button" className={styles.danger} disabled={pending} onClick={() => void act('decline')}>{task.proposedDueDate ? '요청 거절' : '거절'}</button>}
       {task.proposedDueDate && <span className={styles.waiting}>요청자의 마감 변경 응답을 기다리는 중</span>}
     </div>}
+    {task.status === 'REVIEW_PENDING' && isRequester && <div className={styles.actions}>
+      <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('approveReview')}>검수 승인</button>
+      <button type="button" className={styles.danger} disabled={pending} onClick={() => setShowRejection((value) => !value)}>반려하기</button>
+    </div>}
+    {task.status === 'REVIEW_PENDING' && isRequester && showRejection && <div className={styles.rejectionForm}>
+      <label>반려 사유<textarea value={rejectionReason} maxLength={1000} rows={3} onChange={(event) => setRejectionReason(event.target.value)} placeholder="담당자가 수정할 내용을 적어 주세요" /></label>
+      <button type="button" className={styles.danger} disabled={pending || rejectionReason.trim().length < 2} onClick={rejectReview}>반려 사유 보내기</button>
+    </div>}
+    {task.status === 'REWORK' && isAssignee && <div className={styles.actions}><button type="button" className={styles.primary} disabled={pending} onClick={() => void act('resubmitForReview')}>재제출</button></div>}
     {negotiable && isRequester && task.proposedDueDate && <div className={styles.actions}>
       <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('approveDueDate')}>변경 승인</button>
       <button type="button" disabled={pending} onClick={() => void act('rejectDueDate')}>변경 거절</button>
