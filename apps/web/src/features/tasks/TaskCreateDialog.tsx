@@ -99,12 +99,13 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     </div>
     <div className={styles.suggestionPanel}>
       <div className={styles.suggestionIntro}>
-        <div><strong>업무 제목 초안</strong><p>선택한 메시지의 대화 문맥을 참고해 초안을 만듭니다. 선택 후 제목을 수정할 수 있습니다.</p></div>
+        <div><strong>업무 제목 초안</strong><p>선택한 메시지의 대화 문맥을 참고해 초안을 만듭니다. 선택 후 제목을 수정할 수 있습니다.</p><p>AI가 설정된 경우 같은 채널·DM의 메시지 최대 8개가 OpenAI API로 전송됩니다.</p></div>
         <button type="button" disabled={suggestionPending || pending} onClick={() => void requestSuggestions()}>{suggestionPending ? '만드는 중…' : '초안 제안받기'}</button>
       </div>
       {suggestionError && <p className={styles.error} role="alert">{suggestionError}</p>}
       {suggestions && <div className={styles.suggestionList}>
         {suggestions.demo && <p className={styles.demoNotice}>로컬 문장 기반 초안입니다. AI 생성 결과는 아닙니다.</p>}
+        {!suggestions.demo && <p className={styles.demoNotice}>AI가 제안한 제목입니다. 공개 업무로 저장하기 전에 내용을 확인해 주세요.</p>}
         {suggestions.candidates.map((candidate, index) => <button type="button" key={`${candidate.title}-${index}`} className={styles.candidate} disabled={pending} onClick={() => { setTitle(candidate.title); titleRef.current?.focus(); }}>
           <span>{candidate.title}</span><small>{candidate.reason}</small>
         </button>)}

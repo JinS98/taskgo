@@ -25,7 +25,7 @@ export function taskSuggestionError(error: unknown): string {
     case 'functions/unauthenticated': return '다시 로그인한 뒤 제안을 요청해 주세요.';
     case 'functions/permission-denied': return '이 대화에 접근할 수 없습니다.';
     case 'functions/resource-exhausted': return '오늘의 제안 횟수를 모두 사용했습니다.';
-    case 'functions/failed-precondition': return '원본 메시지 상태를 확인해 주세요.';
+    case 'functions/failed-precondition': return 'AI 제안을 사용할 수 없습니다. 직접 업무 제목을 입력해 주세요.';
     case 'functions/unavailable': return '제안을 만들지 못했습니다. 직접 업무 제목을 입력해 주세요.';
     default: return error instanceof Error && !code ? error.message : '제안 요청에 실패했습니다. 직접 업무 제목을 입력해 주세요.';
   }

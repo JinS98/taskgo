@@ -6,7 +6,7 @@ import { initializeApp, deleteApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { connectFirestoreEmulator, doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
-import { suggestTaskFromMessage } from '../lib/taskSuggestions.js';
+import { openAiTaskCandidates, suggestTaskFromMessage } from '../lib/taskSuggestions.js';
 
 assert.equal(process.env.GCLOUD_PROJECT, 'demo-taskgo');
 const projectId = 'demo-taskgo';
@@ -153,7 +153,28 @@ try {
   ]);
   assert.equal(capturedContext.selectedIndex, 7);
 
-  console.log('PASS: task schema, role/source validation, DM privacy, scoped suggestions, and member-only reads.');
+  let sentRequest;
+  const sampleContext = { messages: [{ sender: '요청자', content: '보고서 작성 부탁해요' }], selectedIndex: 0 };
+  const sampleCandidates = [{ title: '보고서 작성', reason: '명시된 요청' }, { title: '보고서 검토', reason: '완료 후 확인' }];
+  const candidates = await openAiTaskCandidates(sampleContext, 'test-key', 'gpt-4.1-mini', async (url, init) => {
+    sentRequest = { url, init };
+    return new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ candidates: sampleCandidates }) }] }] }), { status: 200 });
+  });
+  assert.deepEqual(candidates, sampleCandidates);
+  assert.equal(sentRequest.url, 'https://api.openai.com/v1/responses');
+  assert.equal(sentRequest.init.headers.Authorization, 'Bearer test-key');
+  const sentBody = JSON.parse(sentRequest.init.body);
+  assert.equal(sentBody.store, false);
+  assert.equal(sentBody.model, 'gpt-4.1-mini');
+  assert.equal(sentBody.max_output_tokens, 500);
+  assert.deepEqual(JSON.parse(sentBody.input), sampleContext);
+  assert.equal(sentBody.text.format.type, 'json_schema');
+  assert.equal(sentBody.text.format.strict, true);
+  await assert.rejects(openAiTaskCandidates(sampleContext, 'test-key', 'gpt-4.1-mini', async () => new Response(JSON.stringify({ status: 'incomplete' }), { status: 200 })));
+  await assert.rejects(openAiTaskCandidates(sampleContext, 'test-key', 'gpt-4.1-mini', async () => new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ candidates: [sampleCandidates[0], sampleCandidates[0]] }) }] }] }), { status: 200 })));
+  await assert.rejects(openAiTaskCandidates(sampleContext, 'test-key', 'gpt-4.1-mini', async () => new Response('rate limited', { status: 429 })));
+
+  console.log('PASS: task schema, permissions, scoped suggestions, OpenAI request/response contract, and member-only reads.');
 } finally {
   for (const app of apps) await deleteApp(app);
   await deleteAdminApp(admin);

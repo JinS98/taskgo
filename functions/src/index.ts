@@ -7,12 +7,13 @@ import { defineSecret } from 'firebase-functions/params';
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 import nodemailer from 'nodemailer';
 import { createTaskRecord } from './taskModel.js';
-import { localTaskCandidates, suggestTaskFromMessage } from './taskSuggestions.js';
+import { localTaskCandidates, openAiTaskCandidates, suggestTaskFromMessage } from './taskSuggestions.js';
 
 initializeApp();
 const db = getFirestore();
 const region = 'asia-northeast3';
 const smtpUrl = defineSecret('INVITE_SMTP_URL');
+const taskAiKey = defineSecret('OPENAI_API_KEY');
 const inviteLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 
 export const createTask = onCall({ region }, async (request) => {
@@ -20,9 +21,15 @@ export const createTask = onCall({ region }, async (request) => {
   return createTaskRecord(db, user.uid, request.data);
 });
 
-export const suggestTask = onCall({ region }, async (request) => {
+export const suggestTask = onCall({ region, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {
   const user = await verifiedUser(request);
-  return suggestTaskFromMessage(db, user.uid, request.data, localTaskCandidates, true);
+  const apiKey = taskAiKey.value();
+  if (process.env.FUNCTIONS_EMULATOR === 'true' && (process.env.TASKGO_AI_MOCK === '1' || !apiKey || apiKey === 'local-disabled')) {
+    return suggestTaskFromMessage(db, user.uid, request.data, localTaskCandidates, true);
+  }
+  if (!apiKey || apiKey === 'local-disabled') throw new HttpsError('failed-precondition', 'AI API 키가 설정되지 않았습니다. 수동으로 업무를 작성해 주세요.');
+  const model = process.env.OPENAI_TASK_MODEL || 'gpt-4.1-mini';
+  return suggestTaskFromMessage(db, user.uid, request.data, (context) => openAiTaskCandidates(context, apiKey, model));
 });
 
 function field(data: unknown, key: string): string {
