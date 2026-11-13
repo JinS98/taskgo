@@ -272,6 +272,6 @@ export function LiveChatPanel({ auth, functions, conversation, workspaceId, view
       </form>
       <div className={styles.composerHint}><span>{connection === 'ready' ? '메시지는 팀원에게 실시간으로 전달됩니다.' : '연결되면 메시지를 보낼 수 있습니다.'}</span><span>Enter 전송 · Shift+Enter 줄바꿈</span></div>
     </div>
-    {taskSource?.messageId && <TaskCreateDialog auth={auth} functions={functions} workspaceId={workspaceId} sourceMessageId={taskSource.messageId} sourceContent={taskSource.content} sourceKind={conversation.kind} memberEmails={memberEmails} memberNames={memberNames} onClose={() => setTaskSource(null)} onCreated={() => { setTaskSource(null); setTaskNotice('업무 요청이 저장되었습니다.'); }} />}
+    {taskSource?.messageId && <TaskCreateDialog auth={auth} functions={functions} workspaceId={workspaceId} sourceMessageId={taskSource.messageId} sourceContent={taskSource.content} sourceKind={conversation.kind} viewerId={viewerId} memberEmails={memberEmails} memberNames={memberNames} onClose={() => setTaskSource(null)} onCreated={(selfAssigned) => { setTaskSource(null); setTaskNotice(selfAssigned ? '본인 담당 업무가 수락 상태로 저장되었습니다.' : '업무 요청이 저장되었습니다.'); }} />}
   </section>;
 }

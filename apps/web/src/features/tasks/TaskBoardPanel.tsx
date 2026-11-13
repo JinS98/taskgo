@@ -48,7 +48,7 @@ function TaskHistory({ db, task, memberNames }: { db: Firestore; task: BoardTask
     {state && !state.error && <ol>
       <li><span>업무 요청 생성</span><small>{memberNames[task.requesterId] ?? '요청자'} · {formatDate(task.createdAt)}</small></li>
       {state.events.map((event) => <li key={event.id}>
-        <span>{eventLabels[event.action] ?? event.action}</span>
+        <span>{event.action === 'accept' && event.metadata.automatic ? '본인 담당 업무 자동 수락' : eventLabels[event.action] ?? event.action}</span>
         <small>{memberNames[event.actorId] ?? '멤버'} · {formatDate(event.createdAt)}</small>
         {event.action === 'proposeDueDate' && event.metadata.proposedDueDate && <small>제안 {formatDate(Timestamp.fromDate(new Date(event.metadata.proposedDueDate)))}</small>}
         {event.action === 'approveDueDate' && event.metadata.dueDate && <small>확정 {formatDate(Timestamp.fromDate(new Date(event.metadata.dueDate)))}</small>}

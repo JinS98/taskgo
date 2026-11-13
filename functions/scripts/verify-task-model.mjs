@@ -334,7 +334,24 @@ try {
   assert.equal(reviewHistory.docs.find((event) => event.get('action') === 'resubmitForReview')?.get('metadata.reviewCycle'), 2);
   assert.equal((await adminDb.collection('taskEvents').get()).size, 25);
 
-  console.log('PASS: task schema, permissions, progress, review rejection and resubmission, approval, no-review completion, and history.');
+  const selfTaskId = (await member.create({
+    ...input, sourceMessageId: 'task-dm-source', title: '본인 담당 업무', assigneeId: member.user.uid,
+  })).data.taskId;
+  const selfTask = await adminDb.doc(`tasks/${selfTaskId}`).get();
+  assert.equal(selfTask.get('requesterId'), member.user.uid);
+  assert.equal(selfTask.get('assigneeId'), member.user.uid);
+  assert.equal(selfTask.get('status'), 'ACCEPTED');
+  assert.equal(selfTask.get('createdAt').toMillis(), selfTask.get('updatedAt').toMillis());
+  const selfEvents = await getDocs(query(collection(member.db, 'taskEvents'), where('taskId', '==', selfTaskId)));
+  assert.equal(selfEvents.size, 1);
+  assert.equal(selfEvents.docs[0].get('action'), 'accept');
+  assert.equal(selfEvents.docs[0].get('actorId'), member.user.uid);
+  assert.equal(selfEvents.docs[0].get('metadata.automatic'), true);
+  await rejected(member.respond({ taskId: selfTaskId, action: 'accept' }), 'failed-precondition');
+  await member.respond({ taskId: selfTaskId, action: 'startProgress' });
+  assert.equal((await adminDb.doc(`tasks/${selfTaskId}`).get()).get('status'), 'IN_PROGRESS');
+
+  console.log('PASS: task schema, self-assignment auto-acceptance, permissions, progress, review, completion, and history.');
 } finally {
   for (const app of apps) await deleteApp(app);
   await deleteAdminApp(admin);

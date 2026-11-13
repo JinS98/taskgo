@@ -80,6 +80,7 @@ export async function createTaskRecord(db: Firestore, requesterId: string, value
     }
 
     const now = Timestamp.now();
+    const selfAssigned = input.assigneeId === requesterId;
     const task: TaskRecord<Timestamp> = {
       workspaceId: input.workspaceId,
       sourceMessageId: input.sourceMessageId,
@@ -91,7 +92,7 @@ export async function createTaskRecord(db: Firestore, requesterId: string, value
       dueDate: input.due,
       proposedDueDate: null,
       estimatedMinutes: input.estimate,
-      status: 'REQUESTED',
+      status: selfAssigned ? 'ACCEPTED' : 'REQUESTED',
       reviewRequired: input.reviewRequired,
       reviewWorkingDays: input.reviewDays,
       reviewCycle: 0,
@@ -103,6 +104,15 @@ export async function createTaskRecord(db: Firestore, requesterId: string, value
       updatedAt: now,
     };
     transaction.create(taskRef, task);
+    if (selfAssigned) {
+      transaction.create(db.collection('taskEvents').doc(), {
+        taskId: taskRef.id,
+        actorId: requesterId,
+        action: 'accept',
+        createdAt: now,
+        metadata: { automatic: true },
+      });
+    }
     return { taskId: taskRef.id };
   });
 }

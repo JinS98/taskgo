@@ -11,17 +11,18 @@ function localDateTime(date: Date): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId, sourceContent, sourceKind, memberEmails, memberNames, onClose, onCreated }: {
+export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId, sourceContent, sourceKind, viewerId, memberEmails, memberNames, onClose, onCreated }: {
   auth: Auth;
   functions: Functions;
   workspaceId: string;
   sourceMessageId: string;
   sourceContent: string;
   sourceKind: TaskSourceType;
+  viewerId: string;
   memberEmails: Record<string, string>;
   memberNames: Record<string, string>;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (selfAssigned: boolean) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -39,6 +40,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
   const [suggestions, setSuggestions] = useState<TaskSuggestionResult | null>(null);
   const assignees = Object.keys(memberEmails).sort((a, b) => (memberNames[a] || a).localeCompare(memberNames[b] || b));
   const assigneeName = (uid: string) => memberNames[uid] || `팀원-${uid.slice(0, 4).toUpperCase()}`;
+  const selfAssigned = assigneeId === viewerId;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -83,7 +85,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     };
     try {
       await createTask(auth, functions, request);
-      onCreated();
+      onCreated(selfAssigned);
     } catch (cause) {
       setError(taskCreationError(cause));
     } finally {
@@ -122,6 +124,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
         <label className={styles.field}>담당자<select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required><option value="">담당자를 선택하세요</option>{assignees.map((uid) => <option key={uid} value={uid}>{assigneeName(uid)}{assignees.some((other) => other !== uid && assigneeName(other) === assigneeName(uid)) ? ` · ${uid.slice(0, 4).toUpperCase()}` : ''}</option>)}</select></label>
         <label className={styles.field}>마감 날짜·시간<input type="datetime-local" value={dueLocal} onChange={(event) => setDueLocal(event.target.value)} min={localDateTime(new Date())} required /></label>
       </div>
+      {selfAssigned && <p className={styles.selfAssignedHint}>본인을 담당자로 선택하면 수락 상태로 바로 시작합니다.</p>}
       <label className={styles.field}>설명<textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={3} placeholder="업무에 필요한 내용을 적어 주세요" /></label>
       <label className={`${styles.field} ${styles.estimateField}`}>예상 작업 시간<select value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">선택 안 함</option>{estimateOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes}분` : `${minutes / 60}시간`}</option>)}</select></label>
       <div className={styles.reviewSection}>
@@ -132,7 +135,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     </div>
     <div className={styles.footer}>
       {error && <p className={styles.error} role="alert">{error}</p>}
-      <div className={styles.actions}><button type="button" className={styles.cancel} disabled={pending} onClick={onClose}>취소</button><button type="submit" form="task-create-form" aria-label="업무 요청 저장" className={styles.submit} disabled={pending || assignees.length === 0}>{pending ? '저장 중…' : '요청하기'}</button></div>
+      <div className={styles.actions}><button type="button" className={styles.cancel} disabled={pending} onClick={onClose}>취소</button><button type="submit" form="task-create-form" aria-label={selfAssigned ? '본인 담당 업무 저장' : '업무 요청 저장'} className={styles.submit} disabled={pending || assignees.length === 0}>{pending ? '저장 중…' : selfAssigned ? '업무 만들기' : '요청하기'}</button></div>
     </div>
   </dialog>;
 }

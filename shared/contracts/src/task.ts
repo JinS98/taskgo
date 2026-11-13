@@ -29,6 +29,7 @@ export interface TaskEventRecord<TimestampValue> {
   action: TaskRequestAction;
   createdAt: TimestampValue;
   metadata: {
+    automatic?: boolean;
     previousDueDate?: string;
     proposedDueDate?: string;
     dueDate?: string;
