@@ -6,9 +6,26 @@ import { createTask, suggestTask, taskCreationError, taskSuggestionError, type T
 import styles from './TaskCreateDialog.module.scss';
 
 const estimateOptions = [15, 30, 45, 60, 90, 120, 180, 240, 360, 480];
+const weekdayNames = ['일', '월', '화', '수', '목', '금', '토'];
+const timeOptions = Array.from({ length: 25 }, (_, index) => {
+  const hour = 9 + Math.floor(index / 2);
+  const minute = index % 2 === 0 ? '00' : '30';
+  return { value: `${String(hour).padStart(2, '0')}:${minute}`, label: `${hour < 12 ? '오전' : '오후'} ${hour <= 12 ? hour : hour - 12}:${minute}` };
+});
 
 function localDateTime(date: Date): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function monthCells(year: number, month: number): Date[] {
+  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const dayCount = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const count = Math.ceil((firstWeekday + dayCount) / 7) * 7;
+  return Array.from({ length: count }, (_, index) => new Date(Date.UTC(year, month - 1, index - firstWeekday + 1)));
+}
+
+function dateKey(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
 export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId, sourceContent, sourceKind, viewerId, memberEmails, memberNames, onClose, onCreated }: {
@@ -26,11 +43,19 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const dueButtonRef = useRef<HTMLButtonElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const timeGridRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [requesterId, setRequesterId] = useState(viewerId);
   const [assigneeId, setAssigneeId] = useState('');
   const [dueLocal, setDueLocal] = useState('');
+  const [duePickerOpen, setDuePickerOpen] = useState(false);
+  const [pickerDate, setPickerDate] = useState('');
+  const [pickerMonth, setPickerMonth] = useState({ year: 0, month: 0 });
+  const [pickerNow, setPickerNow] = useState(() => new Date());
+  const [pickerPosition, setPickerPosition] = useState({ top: 0, left: 0, width: 0 });
   const [estimatedMinutes, setEstimatedMinutes] = useState('');
   const [reviewDays, setReviewDays] = useState('');
   const [pending, setPending] = useState(false);
@@ -50,6 +75,59 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     titleRef.current?.focus();
     return () => { if (dialog?.open) dialog.close(); };
   }, []);
+
+  useEffect(() => {
+    if (!duePickerOpen) return;
+    const dialog = dialogRef.current;
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!pickerRef.current?.contains(target) && !dueButtonRef.current?.contains(target)) setDuePickerOpen(false);
+    };
+    dialog?.addEventListener('pointerdown', closeOnOutside);
+    return () => dialog?.removeEventListener('pointerdown', closeOnOutside);
+  }, [duePickerOpen]);
+
+  useEffect(() => {
+    if (!duePickerOpen || !timeGridRef.current) return;
+    const grid = timeGridRef.current;
+    const firstAvailable = grid.querySelector<HTMLButtonElement>('button:not(:disabled)');
+    grid.scrollTop = pickerDate === localDateTime(pickerNow).slice(0, 10) && firstAvailable
+      ? firstAvailable.getBoundingClientRect().top - grid.getBoundingClientRect().top + grid.scrollTop
+      : 0;
+  }, [duePickerOpen, pickerDate, pickerNow]);
+
+  function toggleDuePicker() {
+    if (duePickerOpen) { setDuePickerOpen(false); return; }
+    const now = new Date();
+    const today = localDateTime(now).slice(0, 10);
+    let selected = dueLocal.slice(0, 10) || today;
+    if (!dueLocal && new Date(`${today}T21:00`).getTime() <= now.getTime()) {
+      selected = localDateTime(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)).slice(0, 10);
+    }
+    const [year, month] = selected.split('-').map(Number);
+    const dialog = dialogRef.current?.getBoundingClientRect();
+    const button = dueButtonRef.current?.getBoundingClientRect();
+    if (!dialog || !button) return;
+    const width = Math.min(500, dialog.width - 24);
+    const left = Math.max(12, Math.min(button.left - dialog.left, dialog.width - width - 12));
+    const below = dialog.bottom - button.bottom;
+    const top = below >= 370 ? button.bottom - dialog.top + 6 : Math.max(12, button.top - dialog.top - 366);
+    setPickerNow(now);
+    setPickerDate(selected);
+    setPickerMonth({ year, month });
+    setPickerPosition({ top, left, width });
+    setDuePickerOpen(true);
+  }
+
+  function movePickerMonth(offset: number) {
+    const next = new Date(Date.UTC(pickerMonth.year, pickerMonth.month - 1 + offset, 1));
+    setPickerMonth({ year: next.getUTCFullYear(), month: next.getUTCMonth() + 1 });
+  }
+
+  const todayKey = localDateTime(pickerNow).slice(0, 10);
+  const dueDisplay = dueLocal
+    ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(dueLocal))
+    : '날짜와 시간을 선택하세요';
 
   async function requestSuggestions() {
     if (suggestionPending || pending) return;
@@ -97,7 +175,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
     }
   }
 
-  return <dialog ref={dialogRef} className={styles.dialog} aria-labelledby="task-dialog-title" onCancel={(event) => { event.preventDefault(); if (!pending) onClose(); }} onClick={(event) => {
+  return <dialog ref={dialogRef} className={styles.dialog} aria-labelledby="task-dialog-title" onCancel={(event) => { event.preventDefault(); if (duePickerOpen) setDuePickerOpen(false); else if (!pending) onClose(); }} onClick={(event) => {
     if (pending || event.target !== event.currentTarget) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
@@ -132,7 +210,7 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
       {requesterId !== viewerId && <p className={styles.fieldHint}>선택한 요청자가 마감 변경과 검수를 확인합니다. 실제 생성자는 이력에 남습니다.</p>}
       <label className={styles.field}><span>담당자</span><select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} required><option value="">담당자를 선택하세요</option>{assignees.map((uid) => <option key={uid} value={uid}>{memberOption(uid)}</option>)}</select></label>
       {selfAssigned && <p className={styles.fieldHint}>본인을 담당자로 선택하면 수락 상태로 바로 시작합니다.</p>}
-      <label className={styles.field}><span>마감 날짜·시간</span><input type="datetime-local" value={dueLocal} onChange={(event) => setDueLocal(event.target.value)} min={localDateTime(new Date())} required /></label>
+      <div className={styles.field}><span id="due-label">마감 날짜·시간</span><button ref={dueButtonRef} type="button" className={`${styles.dueTrigger} ${dueLocal ? styles.dueSelected : ''}`} aria-labelledby="due-label due-value" aria-expanded={duePickerOpen} aria-haspopup="dialog" onClick={toggleDuePicker}><span id="due-value">{dueDisplay}</span><svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="14" height="12" rx="2" /><path d="M6.5 2.5v4M13.5 2.5v4M3 8.5h14" /></svg></button></div>
       <label className={`${styles.field} ${styles.descriptionField}`}><span>설명</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={3} placeholder="업무에 필요한 내용을 적어 주세요" /></label>
       <label className={styles.field}><span>예상 작업 시간</span><select value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">선택 안 함</option>{estimateOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes}분` : `${minutes / 60}시간`}</option>)}</select></label>
       <label className={styles.field}><span>완료 후 검수</span><select value={reviewDays} onChange={(event) => setReviewDays(event.target.value)}><option value="">선택 안 함</option>{Array.from({ length: 10 }, (_, index) => index + 1).map((days) => <option key={days} value={days}>{days}근무일</option>)}</select></label>
@@ -142,5 +220,19 @@ export function TaskCreateDialog({ auth, functions, workspaceId, sourceMessageId
       {error && <p className={styles.error} role="alert">{error}</p>}
       <div className={styles.actions}><button type="button" className={styles.cancel} disabled={pending} onClick={onClose}>취소</button><button type="submit" form="task-create-form" aria-label={selfAssigned ? '본인 담당 업무 저장' : '업무 요청 저장'} className={styles.submit} disabled={pending || assignees.length === 0}>{pending ? '저장 중…' : selfAssigned ? '업무 만들기' : '요청하기'}</button></div>
     </div>
+    {duePickerOpen && <div ref={pickerRef} className={styles.duePopover} role="dialog" aria-label="마감 날짜와 시간 선택" style={{ top: pickerPosition.top, left: pickerPosition.left, width: pickerPosition.width }}>
+      <div className={styles.pickerCalendar}>
+        <div className={styles.pickerMonth}><strong>{pickerMonth.year}년 {pickerMonth.month}월</strong><div><button type="button" aria-label="이전 달" onClick={() => movePickerMonth(-1)}>‹</button><button type="button" aria-label="다음 달" onClick={() => movePickerMonth(1)}>›</button></div></div>
+        <div className={styles.pickerWeekdays}>{weekdayNames.map((day, index) => <span key={index}>{day}</span>)}</div>
+        <div className={styles.pickerDays}>{monthCells(pickerMonth.year, pickerMonth.month).map((day) => {
+          const key = dateKey(day);
+          const inMonth = day.getUTCMonth() + 1 === pickerMonth.month;
+          const unavailable = !inMonth || key < todayKey || (key === todayKey && pickerNow.getHours() >= 21);
+          return <button type="button" key={key} aria-label={`${day.getUTCFullYear()}년 ${day.getUTCMonth() + 1}월 ${day.getUTCDate()}일`} aria-pressed={pickerDate === key} className={`${styles.pickerDay} ${pickerDate === key ? styles.pickerDaySelected : ''} ${key === todayKey ? styles.pickerToday : ''}`} disabled={unavailable} onClick={() => setPickerDate(key)}>{day.getUTCDate()}</button>;
+        })}</div>
+        <p className={styles.pickerDateHint}>{pickerDate ? `${Number(pickerDate.slice(5, 7))}월 ${Number(pickerDate.slice(8, 10))}일` : '날짜를 선택하세요'}</p>
+      </div>
+      <div className={styles.pickerTimes}><strong>시간 선택</strong><p>오전 9시부터 오후 9시까지 · 30분 간격</p><div ref={timeGridRef} className={styles.timeGrid}>{timeOptions.map((slot) => <button type="button" key={slot.value} disabled={!pickerDate || new Date(`${pickerDate}T${slot.value}`).getTime() <= pickerNow.getTime()} className={dueLocal === `${pickerDate}T${slot.value}` ? styles.timeSelected : ''} onClick={() => { setDueLocal(`${pickerDate}T${slot.value}`); setDuePickerOpen(false); dueButtonRef.current?.focus(); }}>{slot.label}</button>)}</div></div>
+    </div>}
   </dialog>;
 }

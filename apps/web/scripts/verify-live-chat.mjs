@@ -66,6 +66,25 @@ async function visibleOnce(page, content) {
   assert.equal(await page.getByText(content, { exact: true }).count(), 1, `Duplicate message: ${content}`);
 }
 
+async function chooseDue(dialog, dueLocal, clickIcon = false) {
+  const trigger = dialog.getByRole('button', { name: /마감 날짜·시간/ });
+  await (clickIcon ? trigger.locator('svg') : trigger.locator('#due-value')).click();
+  const picker = dialog.getByRole('dialog', { name: '마감 날짜와 시간 선택' });
+  await picker.waitFor();
+  const timeGrid = picker.locator('[class*="timeGrid"]');
+  await timeGrid.evaluate((element) => new Promise((resolve) => requestAnimationFrame(resolve)));
+  assert.equal(await timeGrid.evaluate((element) => element.scrollHeight > element.clientHeight), true, 'The available times must scroll within the picker.');
+  if (process.env.TASKGO_CAPTURE_UI && !clickIcon) await dialog.screenshot({ path: resolve(root, '.tmp-ui-due-picker.png') });
+  const [year, month, day] = dueLocal.slice(0, 10).split('-').map(Number);
+  if (await picker.getByText(`${year}년 ${month}월`).count() === 0) await picker.getByRole('button', { name: '다음 달' }).click();
+  await picker.getByRole('button', { name: `${year}년 ${month}월 ${day}일` }).click();
+  assert.equal(await picker.getByRole('button', { name: '오후 9:00' }).count(), 1);
+  assert.equal(await picker.getByRole('button', { name: '오전 8:30' }).count(), 0);
+  await picker.getByRole('button', { name: '오전 10:00' }).click();
+  await picker.waitFor({ state: 'hidden' });
+  assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+}
+
 try {
   const owner = await getAuth(admin).createUser({ email: 'live-owner@example.com', password: 'StrongPass123!', emailVerified: true, displayName: '테스트 방장' });
   const member = await getAuth(admin).createUser({ email: 'live-member@example.com', password: 'StrongPass123!', emailVerified: true, displayName: '테스트 멤버' });
@@ -113,11 +132,27 @@ try {
   const memberPage = await (await browser.newContext()).newPage();
   await login(ownerPage, origin, owner.email);
   await login(memberPage, origin, member.email);
-  if (process.env.TASKGO_CAPTURE_UI) {
-    await ownerPage.getByRole('button', { name: '워크스페이스 관리' }).click();
-    await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-management.png') });
-    await ownerPage.getByRole('button', { name: '채팅' }).click();
-  }
+  await ownerPage.getByRole('button', { name: '워크스페이스 관리' }).click();
+  if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-management.png') });
+  let releaseInvite;
+  let notifyInviteStarted;
+  const inviteHeld = new Promise((resolve) => { releaseInvite = resolve; });
+  const inviteStarted = new Promise((resolve) => { notifyInviteStarted = resolve; });
+  await ownerPage.route('**/inviteMember', async (route) => {
+    if (route.request().method() !== 'POST') { await route.continue(); return; }
+    notifyInviteStarted();
+    await inviteHeld;
+    await route.continue();
+  });
+  await ownerPage.getByLabel('이메일 주소').fill('invite-check@example.com');
+  await ownerPage.getByRole('button', { name: '초대 메일 보내기' }).click();
+  try {
+    await Promise.race([inviteStarted, delay(10000).then(() => { throw new Error('Invite request did not start.'); })]);
+    assert.equal(await ownerPage.getByRole('button', { name: '새 공간 만들기' }).isEnabled(), true, 'Workspace creation must stay available while inviting.');
+  } finally { releaseInvite(); }
+  await ownerPage.getByRole('button', { name: '초대 메일 보내기' }).waitFor({ timeout: 15000 });
+  await ownerPage.unroute('**/inviteMember');
+  await ownerPage.getByRole('button', { name: '채팅' }).click();
   assert.equal((await db.doc(`channels/general_${workspaceId}`).get()).get('name'), '전체');
   await visibleOnce(ownerPage, 'history channel 64');
   if (process.env.TASKGO_CAPTURE_UI) {
@@ -174,13 +209,14 @@ try {
     await ownerPage.setViewportSize({ width: 1280, height: 720 });
   }
   const dueLocal = await ownerPage.evaluate(() => {
-    const nextDay = new Date(Date.now() + 86400000);
+    const now = new Date();
+    const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10);
     return new Date(nextDay.getTime() - nextDay.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   });
   await taskDialog.getByLabel('업무 제목').fill('고객 요청 정리');
   await taskDialog.getByLabel('설명').fill('디자인 확인 항목을 정리합니다.');
   await taskDialog.getByLabel('담당자').selectOption({ label: member.displayName });
-  await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
+  await chooseDue(taskDialog, dueLocal);
   await taskDialog.getByLabel('예상 작업 시간').selectOption('90');
   await taskDialog.getByRole('button', { name: '업무 요청 저장' }).click();
   await ownerPage.getByText('업무 요청이 저장되었습니다.').waitFor();
@@ -301,7 +337,7 @@ try {
   assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), 'earlier direct message');
   await taskDialog.getByLabel('업무 제목').fill('비공개 대화 후속 업무');
   await taskDialog.getByLabel('담당자').selectOption({ label: member.displayName });
-  await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
+  await chooseDue(taskDialog, dueLocal, true);
   await taskDialog.getByLabel('완료 후 검수').selectOption('2');
   await taskDialog.getByRole('button', { name: '업무 요청 저장' }).click();
   await ownerPage.getByText('업무 요청이 저장되었습니다.').waitFor();
@@ -320,7 +356,7 @@ try {
   taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
   await taskDialog.getByLabel('업무 제목').fill('검수 요청 업무');
   await taskDialog.getByLabel('담당자').selectOption({ label: member.displayName });
-  await taskDialog.getByLabel('마감 날짜·시간').fill(dueLocal);
+  await chooseDue(taskDialog, dueLocal);
   await taskDialog.getByLabel('완료 후 검수').selectOption('2');
   await taskDialog.getByRole('button', { name: '업무 요청 저장' }).click();
   const reviewTaskCard = memberPage.getByRole('article').filter({ hasText: '검수 요청 업무' });

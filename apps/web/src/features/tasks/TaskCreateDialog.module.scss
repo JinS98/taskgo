@@ -34,6 +34,35 @@
 .descriptionField { align-items:start; }
 .field input:focus,.field select:focus,.field textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px #5849c818; }
 .field input::placeholder,.field textarea::placeholder { color:#a1aaba; }
+.dueTrigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-width:0; min-height:37px; padding:8px 10px; border:1px solid #dce1e8; border-radius:6px; background:#fff; color:#8590a0; cursor:pointer; text-align:left; font:inherit; font-size:12px; font-weight:500; }
+.dueTrigger:hover { border-color:#9f9bcf; background:#fbfaff; }
+.dueTrigger:focus-visible,.dueTrigger[aria-expanded="true"] { outline:0; border-color:var(--accent); box-shadow:0 0 0 3px #5849c818; }
+.dueTrigger svg { flex:0 0 17px; width:17px; height:17px; color:#5d52ba; }
+.dueSelected { color:#283345; }
+.duePopover { position:absolute; z-index:10; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); height:354px; overflow:hidden; border:1px solid #d9dfea; border-radius:10px; background:#fff; box-shadow:0 20px 50px #18223940,0 2px 8px #18223918; color:#263245; font-size:12px; }
+.pickerCalendar { min-width:0; padding:17px 16px 12px; border-right:1px solid #e9ecf1; }
+.pickerMonth { display:flex; justify-content:space-between; align-items:center; min-height:27px; margin-bottom:12px; }
+.pickerMonth strong,.pickerTimes strong { font-size:13px; font-weight:750; }
+.pickerMonth > div { display:flex; gap:3px; }
+.pickerMonth button { width:26px; height:26px; border:1px solid #e1e5ed; border-radius:6px; background:#fff; color:#526077; cursor:pointer; font-size:20px; line-height:1; }
+.pickerMonth button:hover { border-color:#b7b0e8; background:#f3f1ff; color:#5544c6; }
+.pickerWeekdays,.pickerDays { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); text-align:center; }
+.pickerWeekdays { margin-bottom:5px; color:#8a95a4; font-size:11px; font-weight:650; }
+.pickerWeekdays span { padding:4px 0; }
+.pickerDays { gap:3px 0; }
+.pickerDay { display:grid; place-items:center; width:29px; height:29px; margin:auto; padding:0; border:0; border-radius:7px; background:transparent; color:#344157; cursor:pointer; font:inherit; font-size:11px; }
+.pickerDay:hover:not(:disabled) { background:#f0edff; color:#4d3abf; }
+.pickerDay:disabled { color:#c5cbd4; cursor:default; }
+.pickerToday:not(.pickerDaySelected) { box-shadow:inset 0 0 0 1px #b9b0ed; color:#5545c6; }
+.pickerDaySelected,.pickerDaySelected:hover:not(:disabled) { background:var(--accent); color:#fff; font-weight:750; }
+.pickerDateHint { margin:13px 0 0; color:#737f91; font-size:11px; }
+.pickerTimes { display:flex; flex-direction:column; min-width:0; min-height:0; padding:19px 15px 12px; }
+.pickerTimes p { margin:4px 0 12px; color:#7c8797; font-size:10px; line-height:1.4; }
+.timeGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; flex:1 1 auto; gap:6px; min-height:0; padding-right:3px; overflow-y:auto; scrollbar-width:thin; }
+.timeGrid button { min-height:32px; border:1px solid #e0e5ed; border-radius:6px; background:#fff; color:#39465a; cursor:pointer; font:inherit; font-size:11px; font-weight:650; }
+.timeGrid button:hover:not(:disabled) { border-color:#a99ee8; background:#f6f4ff; color:#4e3db9; }
+.timeGrid button:disabled { color:#bcc4d0; background:#f6f7f9; cursor:default; }
+.timeGrid .timeSelected { border-color:var(--accent); background:#f0edff; color:#4f3dc0; }
 .fieldHint { margin:0 0 0 134px; padding:0 0 9px; color:#667386; font-size:10px; line-height:1.5; }
 .error { margin:0; padding:10px 12px; border:1px solid #f1d5db; border-radius:7px; background:#fff2f4; color:#9c3e50; font-size:11px; }
 .footer { flex:0 0 auto; border-top:1px solid var(--line); background:#fff; }
@@ -44,4 +73,4 @@
 .cancel { border:1px solid #dce1e9; background:#fff; color:#526075; }
 .submit { border:1px solid var(--accent); background:var(--accent); color:#fff; }
 .submit:hover { background:#493ab9; }
-@media (max-width:600px) { .header { padding:19px 18px 15px; } .source { padding:14px 18px; } .suggestionPanel { padding:12px 18px; } .suggestionIntro { align-items:stretch; flex-direction:column; } .form { padding:4px 18px 17px; } .field { grid-template-columns:1fr; gap:6px; } .fieldHint { margin-left:2px; } .footer .error { margin:10px 18px 0; } .actions { padding:10px 18px 12px; } }
+@media (max-width:600px) { .header { padding:19px 18px 15px; } .source { padding:14px 18px; } .suggestionPanel { padding:12px 18px; } .suggestionIntro { align-items:stretch; flex-direction:column; } .form { padding:4px 18px 17px; } .field { grid-template-columns:1fr; gap:6px; } .fieldHint { margin-left:2px; } .footer .error { margin:10px 18px 0; } .actions { padding:10px 18px 12px; } .duePopover { grid-template-columns:1fr; height:min(550px,calc(90dvh - 24px)); overflow-y:auto; } .pickerCalendar { border-right:0; border-bottom:1px solid #e9ecf1; } .pickerTimes { min-height:200px; } .timeGrid { min-height:160px; max-height:180px; } }

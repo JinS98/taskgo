@@ -29,7 +29,9 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [inviteActionError, setInviteActionError] = useState('');
-  const [pending, setPending] = useState(false);
+  const [createPending, setCreatePending] = useState(false);
+  const [invitePending, setInvitePending] = useState(false);
+  const [revokingIds, setRevokingIds] = useState<Set<string>>(() => new Set());
   const [name, setName] = useState('');
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -93,8 +95,8 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
-    setPending(true); setError('');
+    if (createPending) return;
+    setCreatePending(true); setError('');
     try {
       const result = await createWorkspace(auth, db, name);
       setCreatedWorkspaceId(result.workspaceId);
@@ -105,25 +107,25 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
       setMembersError('');
       setName('');
     } catch (cause) { setError(workspaceCreationError(cause)); }
-    finally { setPending(false); }
+    finally { setCreatePending(false); }
   }
 
   async function invite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected || pending) return;
-    setPending(true); setInviteActionError(''); setInvitesError(''); setLocalLink('');
+    if (!selected || invitePending) return;
+    const workspaceId = selected.workspaceId;
+    setInvitePending(true); setInviteActionError(''); setInvitesError(''); setLocalLink('');
     try {
-      const result = await callWorkspace<{ inviteId: string; link?: string }>(auth, functions, 'inviteMember', { workspaceId: selected.workspaceId, email });
+      const result = await callWorkspace<{ inviteId: string; link?: string }>(auth, functions, 'inviteMember', { workspaceId, email });
       setEmail('');
       const localUrl = result.link ? new URL(result.link) : null;
-      setLocalLink(localUrl ? `${window.location.origin}${localUrl.pathname}${localUrl.search}` : '초대 메일을 보냈습니다.');
+      if (selectedWorkspaceIdRef.current === workspaceId) setLocalLink(localUrl ? `${window.location.origin}${localUrl.pathname}${localUrl.search}` : '초대 메일을 보냈습니다.');
       try {
-        const next = await callWorkspace<{ invites: Invite[] }>(auth, functions, 'listInvites', { workspaceId: selected.workspaceId });
-        setInvites(next.invites);
-        setInvitesWorkspaceId(selected.workspaceId);
-      } catch (cause) { setInvitesError(workspaceError(cause)); }
-    } catch (cause) { setInviteActionError(workspaceError(cause)); }
-    finally { setPending(false); }
+        const next = await callWorkspace<{ invites: Invite[] }>(auth, functions, 'listInvites', { workspaceId });
+        if (selectedWorkspaceIdRef.current === workspaceId) { setInvites(next.invites); setInvitesWorkspaceId(workspaceId); }
+      } catch (cause) { if (selectedWorkspaceIdRef.current === workspaceId) setInvitesError(workspaceError(cause)); }
+    } catch (cause) { if (selectedWorkspaceIdRef.current === workspaceId) setInviteActionError(workspaceError(cause)); }
+    finally { setInvitePending(false); }
   }
 
   function joinWithLink(event: FormEvent<HTMLFormElement>) {
@@ -139,13 +141,14 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
   }
 
   async function revoke(inviteId: string) {
-    if (!selected || pending) return;
-    setPending(true); setInviteActionError('');
+    if (!selected || revokingIds.has(inviteId)) return;
+    const workspaceId = selected.workspaceId;
+    setRevokingIds((current) => new Set(current).add(inviteId)); setInviteActionError('');
     try {
       await callWorkspace(auth, functions, 'revokeInvite', { inviteId });
-      setInvites((current) => current.map((item) => item.inviteId === inviteId ? { ...item, status: 'revoked' } : item));
-    } catch (cause) { setInviteActionError(workspaceError(cause)); }
-    finally { setPending(false); }
+      if (selectedWorkspaceIdRef.current === workspaceId) setInvites((current) => current.map((item) => item.inviteId === inviteId ? { ...item, status: 'revoked' } : item));
+    } catch (cause) { if (selectedWorkspaceIdRef.current === workspaceId) setInviteActionError(workspaceError(cause)); }
+    finally { setRevokingIds((current) => { const next = new Set(current); next.delete(inviteId); return next; }); }
   }
 
   async function refreshInvites() {
@@ -186,8 +189,8 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
             <p>팀의 공간을 만들면 워크스페이스 장이 됩니다.</p>
             <form onSubmit={create} className={styles.form}>
               <label htmlFor="workspace-name">워크스페이스 이름</label>
-              <input id="workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={pending} />
-              <button type="submit" disabled={pending}>{pending ? '만드는 중…' : '만들기'}</button>
+              <input id="workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={createPending} />
+              <button type="submit" disabled={createPending}>{createPending ? '만드는 중…' : '만들기'}</button>
             </form>
             {error && <p className={styles.error} role="alert">{error}</p>}
           </section>
@@ -228,14 +231,14 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
         <div className={styles.managementHeading}><p className={styles.eyebrow}>WORKSPACE</p><h1>{selected.name} 관리</h1><p>멤버와 초대 현황을 확인하고 새 멤버를 초대하세요.</p></div>
         <div className={styles.managementGrid}>
           <section className={styles.managementCard} aria-labelledby="invite-title"><div className={styles.cardHeading}><h2 id="invite-title">멤버 초대</h2></div><p className={styles.helper}>이메일 주소로 초대 링크를 보냅니다. 상대방은 같은 주소로 로그인해 수락할 수 있습니다.</p>
-            <form className={styles.form} onSubmit={invite}><label htmlFor="invite-email">이메일 주소</label><input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={pending} placeholder="name@example.com" /><button type="submit" disabled={pending}>{pending ? '처리 중…' : '초대 메일 보내기'}</button></form>
+            <form className={styles.form} onSubmit={invite}><label htmlFor="invite-email">이메일 주소</label><input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={invitePending} placeholder="name@example.com" /><button type="submit" disabled={invitePending}>{invitePending ? '처리 중…' : '초대 메일 보내기'}</button></form>
             {localLink && <p className={styles.localLink} role="status">{localLink.startsWith('http') ? <a href={localLink}>로컬 초대 링크</a> : localLink}</p>}
             {inviteActionError && <p className={styles.error} role="alert">{inviteActionError}</p>}
           </section>
-          <section className={styles.managementCard} aria-labelledby="create-title"><div className={styles.cardHeading}><h2 id="create-title">새 워크스페이스</h2></div><p className={styles.helper}>별도의 팀 공간을 만들고 관리합니다.</p><form className={styles.form} onSubmit={create}><label htmlFor="new-workspace-name">워크스페이스 이름</label><input id="new-workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={pending} placeholder="새 워크스페이스 이름" /><button type="submit" disabled={pending}>새 공간 만들기</button></form>{error && <p className={styles.error} role="alert">{error}</p>}</section>
+          <section className={styles.managementCard} aria-labelledby="create-title"><div className={styles.cardHeading}><h2 id="create-title">새 워크스페이스</h2></div><p className={styles.helper}>별도의 팀 공간을 만들고 관리합니다.</p><form className={styles.form} onSubmit={create}><label htmlFor="new-workspace-name">워크스페이스 이름</label><input id="new-workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={createPending} placeholder="새 워크스페이스 이름" /><button type="submit" disabled={createPending}>{createPending ? '만드는 중…' : '새 공간 만들기'}</button></form>{error && <p className={styles.error} role="alert">{error}</p>}</section>
           <section className={`${styles.managementCard} ${styles.wideCard}`} aria-labelledby="invites-title"><div className={styles.cardHeading}><h2 id="invites-title">초대 현황</h2><div className={styles.cardActions}><span>{invitesWorkspaceId === selected.workspaceId ? invites.length : 0}건</span><button type="button" onClick={refreshInvites} disabled={invitesWorkspaceId !== selected.workspaceId}>새로고침</button></div></div>
             {invitesError && <p className={styles.error} role="alert">{invitesError}</p>}
-            {!invitesError && (invitesWorkspaceId !== selected.workspaceId ? <p className={styles.empty}>초대 현황을 불러오는 중입니다…</p> : invites.length ? <ul className={styles.invites}>{invites.map((item) => <li key={item.inviteId}><span>{item.email}<small>{item.status === 'pending' ? '대기 중' : item.status === 'accepted' ? '수락됨' : '철회됨'} · 만료 {new Date(item.expiresAt).toLocaleDateString('ko-KR')}</small></span>{item.status === 'pending' && <button type="button" disabled={pending} onClick={() => revoke(item.inviteId)}>초대 철회</button>}</li>)}</ul> : <p className={styles.empty}>아직 보낸 초대가 없습니다.</p>)}
+            {!invitesError && (invitesWorkspaceId !== selected.workspaceId ? <p className={styles.empty}>초대 현황을 불러오는 중입니다…</p> : invites.length ? <ul className={styles.invites}>{invites.map((item) => <li key={item.inviteId}><span>{item.email}<small>{item.status === 'pending' ? '대기 중' : item.status === 'accepted' ? '수락됨' : '철회됨'} · 만료 {new Date(item.expiresAt).toLocaleDateString('ko-KR')}</small></span>{item.status === 'pending' && <button type="button" disabled={revokingIds.has(item.inviteId)} onClick={() => revoke(item.inviteId)}>{revokingIds.has(item.inviteId) ? '철회 중…' : '초대 철회'}</button>}</li>)}</ul> : <p className={styles.empty}>아직 보낸 초대가 없습니다.</p>)}
           </section>
           <section className={`${styles.managementCard} ${styles.wideCard}`} aria-labelledby="members-title"><div className={styles.cardHeading}><h2 id="members-title">워크스페이스 멤버</h2><span>{membersWorkspaceId === selected.workspaceId ? members.length : 0}명</span></div>
             {membersError && <p className={styles.error} role="alert">{membersError}</p>}
